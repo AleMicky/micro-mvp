@@ -1,0 +1,117 @@
+services:
+  postgres-catalogos:
+    image: postgres:16-alpine
+    container_name: postgres-catalogos
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_catalogos_data:/var/lib/postgresql/data
+      - ./ms-catalogos/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./ms-catalogos/db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-inventario:
+    image: postgres:16-alpine
+    container_name: postgres-inventario
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_INVENTARIO_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_INVENTARIO_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_INVENTARIO_DB}
+    ports:
+      - "${POSTGRES_INVENTARIO_PORT}:5432"
+    volumes:
+      - postgres_inventario_data:/var/lib/postgresql/data
+      - ./ms-inventario/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_INVENTARIO_USER} -d ${POSTGRES_INVENTARIO_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ms-catalogos:
+    build:
+      context: ./ms-catalogos
+      dockerfile: Dockerfile
+    container_name: ms-catalogos
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-catalogos:5432/${POSTGRES_DB}
+    ports:
+      - "${MS_CATALOGOS_PORT}:8001"
+    depends_on:
+      postgres-catalogos:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  ms-inventario:
+    build:
+      context: ./ms-inventario
+      dockerfile: Dockerfile
+    container_name: ms-inventario
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_INVENTARIO_USER}:${POSTGRES_INVENTARIO_PASSWORD}@postgres-inventario:5432/${POSTGRES_INVENTARIO_DB}
+      SERVICE_NAME: ms-inventario
+      RUN_SEED: "true"
+      MS_CATALOGOS_URL: http://ms-catalogos:8001
+    ports:
+      - "${MS_INVENTARIO_PORT}:8002"
+    depends_on:
+      postgres-inventario:
+        condition: service_healthy
+      ms-catalogos:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MS_CATALOGOS_URL: http://ms-catalogos:8001
+      MS_INVENTARIO_URL: http://ms-inventario:8002
+    ports:
+      - "${API_GATEWAY_PORT}:8000"
+    depends_on:
+      ms-catalogos:
+        condition: service_healthy
+      ms-inventario:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  postgres_catalogos_data:
+  postgres_inventario_data:
