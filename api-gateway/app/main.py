@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.core.cors import setup_cors
-from app.middleware.jwt import JWTPlaceholderMiddleware
+from app.middleware.jwt import JWTAuthMiddleware
 from app.routers import health, proxy
 
 app = FastAPI(
@@ -11,7 +11,7 @@ app = FastAPI(
 )
 
 setup_cors(app)
-app.add_middleware(JWTPlaceholderMiddleware)
+app.add_middleware(JWTAuthMiddleware)
 
 app.include_router(health.router)
 app.include_router(proxy.router)

@@ -38,6 +38,26 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: postgres-auth
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_AUTH_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_AUTH_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_AUTH_DB}
+    ports:
+      - "${POSTGRES_AUTH_PORT}:5432"
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+      - ./ms-auth/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./ms-auth/db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_AUTH_USER} -d ${POSTGRES_AUTH_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   ms-catalogos:
     build:
       context: ./ms-catalogos
@@ -87,6 +107,34 @@ services:
       retries: 3
       start_period: 15s
 
+  ms-auth:
+    build:
+      context: ./ms-auth
+      dockerfile: Dockerfile
+    container_name: ms-auth
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_AUTH_USER}:${POSTGRES_AUTH_PASSWORD}@postgres-auth:5432/${POSTGRES_AUTH_DB}
+      SERVICE_NAME: ms-auth
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
+      RUN_SEED: "true"
+    ports:
+      - "${MS_AUTH_PORT}:8003"
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -98,12 +146,17 @@ services:
     environment:
       MS_CATALOGOS_URL: http://ms-catalogos:8001
       MS_INVENTARIO_URL: http://ms-inventario:8002
+      MS_AUTH_URL: http://ms-auth:8003
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
     ports:
       - "${API_GATEWAY_PORT}:8000"
     depends_on:
       ms-catalogos:
         condition: service_healthy
       ms-inventario:
+        condition: service_healthy
+      ms-auth:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -115,3 +168,4 @@ services:
 volumes:
   postgres_catalogos_data:
   postgres_inventario_data:
+  postgres_auth_data:
