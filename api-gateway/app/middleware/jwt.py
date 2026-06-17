@@ -14,7 +14,7 @@ PUBLIC_ROUTES = {
     ("POST", "/auth/register"),
 }
 
-PROTECTED_PREFIXES = ("/catalogos", "/inventario")
+PROTECTED_PREFIXES = ("/catalogos", "/inventario", "/compras", "/ventas", "/finanzas", "/reportes")
 PROTECTED_AUTH_PATHS = (
     "/auth/me",
     "/auth/logout",

@@ -58,6 +58,82 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-compras:
+    image: postgres:16-alpine
+    container_name: postgres-compras
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_COMPRAS_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_COMPRAS_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_COMPRAS_DB}
+    ports:
+      - "${POSTGRES_COMPRAS_PORT}:5432"
+    volumes:
+      - postgres_compras_data:/var/lib/postgresql/data
+      - ./ms-compras/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_COMPRAS_USER} -d ${POSTGRES_COMPRAS_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-ventas:
+    image: postgres:16-alpine
+    container_name: postgres-ventas
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_VENTAS_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_VENTAS_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_VENTAS_DB}
+    ports:
+      - "${POSTGRES_VENTAS_PORT}:5432"
+    volumes:
+      - postgres_ventas_data:/var/lib/postgresql/data
+      - ./ms-ventas/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_VENTAS_USER} -d ${POSTGRES_VENTAS_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-finanzas:
+    image: postgres:16-alpine
+    container_name: postgres-finanzas
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_FINANZAS_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_FINANZAS_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_FINANZAS_DB}
+    ports:
+      - "${POSTGRES_FINANZAS_PORT}:5432"
+    volumes:
+      - postgres_finanzas_data:/var/lib/postgresql/data
+      - ./ms-finanzas/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_FINANZAS_USER} -d ${POSTGRES_FINANZAS_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-reportes:
+    image: postgres:16-alpine
+    container_name: postgres-reportes
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_REPORTES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_REPORTES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_REPORTES_DB}
+    ports:
+      - "${POSTGRES_REPORTES_PORT}:5432"
+    volumes:
+      - postgres_reportes_data:/var/lib/postgresql/data
+      - ./ms-reportes/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_REPORTES_USER} -d ${POSTGRES_REPORTES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   ms-catalogos:
     build:
       context: ./ms-catalogos
@@ -135,6 +211,128 @@ services:
       retries: 3
       start_period: 15s
 
+  ms-finanzas:
+    build:
+      context: ./ms-finanzas
+      dockerfile: Dockerfile
+    container_name: ms-finanzas
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_FINANZAS_USER}:${POSTGRES_FINANZAS_PASSWORD}@postgres-finanzas:5432/${POSTGRES_FINANZAS_DB}
+      SERVICE_NAME: ms-finanzas
+      RUN_SEED: "true"
+    ports:
+      - "${MS_FINANZAS_PORT}:8006"
+    depends_on:
+      postgres-finanzas:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  ms-compras:
+    build:
+      context: ./ms-compras
+      dockerfile: Dockerfile
+    container_name: ms-compras
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_COMPRAS_USER}:${POSTGRES_COMPRAS_PASSWORD}@postgres-compras:5432/${POSTGRES_COMPRAS_DB}
+      SERVICE_NAME: ms-compras
+      RUN_SEED: "true"
+      MS_INVENTARIO_URL: http://ms-inventario:8002
+      MS_FINANZAS_URL: http://ms-finanzas:8006
+    ports:
+      - "${MS_COMPRAS_PORT}:8004"
+    depends_on:
+      postgres-compras:
+        condition: service_healthy
+      ms-inventario:
+        condition: service_healthy
+      ms-finanzas:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  ms-ventas:
+    build:
+      context: ./ms-ventas
+      dockerfile: Dockerfile
+    container_name: ms-ventas
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_VENTAS_USER}:${POSTGRES_VENTAS_PASSWORD}@postgres-ventas:5432/${POSTGRES_VENTAS_DB}
+      SERVICE_NAME: ms-ventas
+      RUN_SEED: "true"
+      MS_INVENTARIO_URL: http://ms-inventario:8002
+      MS_FINANZAS_URL: http://ms-finanzas:8006
+    ports:
+      - "${MS_VENTAS_PORT}:8005"
+    depends_on:
+      postgres-ventas:
+        condition: service_healthy
+      ms-inventario:
+        condition: service_healthy
+      ms-finanzas:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  ms-reportes:
+    build:
+      context: ./ms-reportes
+      dockerfile: Dockerfile
+    container_name: ms-reportes
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_REPORTES_USER}:${POSTGRES_REPORTES_PASSWORD}@postgres-reportes:5432/${POSTGRES_REPORTES_DB}
+      SERVICE_NAME: ms-reportes
+      MS_CATALOGOS_URL: http://ms-catalogos:8001
+      MS_INVENTARIO_URL: http://ms-inventario:8002
+      MS_COMPRAS_URL: http://ms-compras:8004
+      MS_VENTAS_URL: http://ms-ventas:8005
+      MS_FINANZAS_URL: http://ms-finanzas:8006
+    ports:
+      - "${MS_REPORTES_PORT}:8007"
+    depends_on:
+      postgres-reportes:
+        condition: service_healthy
+      ms-catalogos:
+        condition: service_healthy
+      ms-inventario:
+        condition: service_healthy
+      ms-compras:
+        condition: service_healthy
+      ms-ventas:
+        condition: service_healthy
+      ms-finanzas:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -147,6 +345,10 @@ services:
       MS_CATALOGOS_URL: http://ms-catalogos:8001
       MS_INVENTARIO_URL: http://ms-inventario:8002
       MS_AUTH_URL: http://ms-auth:8003
+      MS_COMPRAS_URL: http://ms-compras:8004
+      MS_VENTAS_URL: http://ms-ventas:8005
+      MS_FINANZAS_URL: http://ms-finanzas:8006
+      MS_REPORTES_URL: http://ms-reportes:8007
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
     ports:
@@ -158,6 +360,14 @@ services:
         condition: service_healthy
       ms-auth:
         condition: service_healthy
+      ms-compras:
+        condition: service_healthy
+      ms-ventas:
+        condition: service_healthy
+      ms-finanzas:
+        condition: service_healthy
+      ms-reportes:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
@@ -165,7 +375,23 @@ services:
       retries: 3
       start_period: 5s
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT}:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+
 volumes:
   postgres_catalogos_data:
   postgres_inventario_data:
   postgres_auth_data:
+  postgres_compras_data:
+  postgres_ventas_data:
+  postgres_finanzas_data:
+  postgres_reportes_data:

@@ -85,3 +85,39 @@ async def proxy_inventario(path: str, request: Request) -> Response:
 async def proxy_auth(path: str, request: Request) -> Response:
     target_url = _build_auth_target(path)
     return await _proxy_request(target_url, request)
+
+
+@router.api_route(
+    "/compras/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_compras(path: str, request: Request) -> Response:
+    target_url = f"{settings.ms_compras_url}/{path}"
+    return await _proxy_request(target_url, request)
+
+
+@router.api_route(
+    "/ventas/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_ventas(path: str, request: Request) -> Response:
+    target_url = f"{settings.ms_ventas_url}/{path}"
+    return await _proxy_request(target_url, request)
+
+
+@router.api_route(
+    "/finanzas/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_finanzas(path: str, request: Request) -> Response:
+    target_url = f"{settings.ms_finanzas_url}/{path}"
+    return await _proxy_request(target_url, request)
+
+
+@router.api_route(
+    "/reportes/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_reportes(path: str, request: Request) -> Response:
+    target_url = f"{settings.ms_reportes_url}/{path}"
+    return await _proxy_request(target_url, request)

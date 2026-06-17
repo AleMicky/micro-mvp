@@ -3,18 +3,12 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 
-const props = defineProps<{
-  modelValue: boolean
-}>()
-
-const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-}>()
+const props = defineProps<{ modelValue: boolean }>()
+const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-
 const openedGroups = ref<string[]>([])
 
 const drawer = computed({
@@ -31,6 +25,15 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { title: 'Dashboard', icon: 'mdi-view-dashboard-outline', to: '/dashboard' },
+  {
+    title: 'Seguridad',
+    icon: 'mdi-shield-account-outline',
+    children: [
+      { title: 'Usuarios', icon: 'mdi-account-group-outline', to: '/seguridad/usuarios' },
+      { title: 'Roles', icon: 'mdi-badge-account-outline', to: '/seguridad/roles' },
+      { title: 'Permisos', icon: 'mdi-key-outline', to: '/seguridad/permisos' },
+    ],
+  },
   {
     title: 'Catálogos',
     icon: 'mdi-book-open-page-variant-outline',
@@ -56,22 +59,57 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
-    title: 'Seguridad',
-    icon: 'mdi-shield-account-outline',
+    title: 'Compras',
+    icon: 'mdi-cart-arrow-down',
     children: [
-      { title: 'Usuarios', icon: 'mdi-account-group-outline', to: '/seguridad/usuarios' },
-      { title: 'Roles', icon: 'mdi-badge-account-outline', to: '/seguridad/roles' },
-      { title: 'Permisos', icon: 'mdi-key-outline', to: '/seguridad/permisos' },
+      { title: 'Proveedores', icon: 'mdi-truck-outline', to: '/compras/proveedores' },
+      { title: 'Cotizaciones de compra', icon: 'mdi-file-document-edit-outline', to: '/compras/cotizaciones' },
+      { title: 'Órdenes de compra', icon: 'mdi-clipboard-list-outline', to: '/compras/ordenes' },
+      { title: 'Recepciones de compra', icon: 'mdi-package-down', to: '/compras/recepciones' },
+    ],
+  },
+  {
+    title: 'Ventas',
+    icon: 'mdi-cart-arrow-up',
+    children: [
+      { title: 'Clientes', icon: 'mdi-account-outline', to: '/ventas/clientes' },
+      { title: 'Cotizaciones de venta', icon: 'mdi-file-document-edit-outline', to: '/ventas/cotizaciones' },
+      { title: 'Ventas', icon: 'mdi-cash-register', to: '/ventas/ventas' },
+      { title: 'Facturas', icon: 'mdi-receipt-text-outline', to: '/ventas/facturas' },
+    ],
+  },
+  {
+    title: 'Finanzas',
+    icon: 'mdi-cash-multiple',
+    children: [
+      { title: 'Cuentas por cobrar', icon: 'mdi-cash-plus', to: '/finanzas/cuentas-por-cobrar' },
+      { title: 'Cuentas por pagar', icon: 'mdi-cash-minus', to: '/finanzas/cuentas-por-pagar' },
+      { title: 'Pagos', icon: 'mdi-bank-transfer-out', to: '/finanzas/pagos' },
+      { title: 'Cobros', icon: 'mdi-bank-transfer-in', to: '/finanzas/cobros' },
+      { title: 'Cajas', icon: 'mdi-cash', to: '/finanzas/cajas' },
+      { title: 'Bancos', icon: 'mdi-bank-outline', to: '/finanzas/bancos' },
+      { title: 'Movimientos financieros', icon: 'mdi-chart-timeline-variant', to: '/finanzas/movimientos' },
+    ],
+  },
+  {
+    title: 'Reportes',
+    icon: 'mdi-chart-bar',
+    children: [
+      { title: 'Reporte de stock', icon: 'mdi-package-variant', to: '/reportes/stock' },
+      { title: 'Reporte de kardex', icon: 'mdi-file-document-outline', to: '/reportes/kardex' },
+      { title: 'Reporte de compras', icon: 'mdi-cart-arrow-down', to: '/reportes/compras' },
+      { title: 'Reporte de ventas', icon: 'mdi-cart-arrow-up', to: '/reportes/ventas' },
+      { title: 'Reporte financiero', icon: 'mdi-finance', to: '/reportes/financiero' },
+      { title: 'Exportar PDF / Excel', icon: 'mdi-download', to: '/reportes/exportar' },
     ],
   },
 ]
 
 function syncOpenedGroups() {
   const path = route.path
-  const groups = menuItems
+  openedGroups.value = menuItems
     .filter((item) => item.children?.some((child) => child.to && path.startsWith(child.to)))
     .map((item) => item.title)
-  openedGroups.value = groups
 }
 
 watch(() => route.path, syncOpenedGroups, { immediate: true })
@@ -119,15 +157,9 @@ async function handleLogout() {
           color="primary"
           :active="isActive(item.to)"
         />
-
         <v-list-group v-else :value="item.title">
           <template #activator="{ props: groupProps }">
-            <v-list-item
-              v-bind="groupProps"
-              :prepend-icon="item.icon"
-              :title="item.title"
-              rounded="lg"
-            />
+            <v-list-item v-bind="groupProps" :prepend-icon="item.icon" :title="item.title" rounded="lg" />
           </template>
           <v-list-item
             v-for="child in item.children"
@@ -147,31 +179,14 @@ async function handleLogout() {
     <template #append>
       <v-divider />
       <div class="pa-4">
-        <v-btn
-          block
-          variant="tonal"
-          color="error"
-          prepend-icon="mdi-logout"
-          @click="handleLogout"
-        >
-          Cerrar sesión
-        </v-btn>
+        <v-btn block variant="tonal" color="error" prepend-icon="mdi-logout" @click="handleLogout">Cerrar sesión</v-btn>
       </div>
     </template>
   </v-navigation-drawer>
 </template>
 
 <style scoped>
-.sidebar {
-  background: rgb(var(--v-theme-surface));
-}
-
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-}
-
-.sidebar-subitem {
-  margin-left: 8px;
-}
+.sidebar { background: rgb(var(--v-theme-surface)); }
+.sidebar-brand { display: flex; align-items: center; }
+.sidebar-subitem { margin-left: 8px; }
 </style>
