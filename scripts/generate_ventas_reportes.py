@@ -9,7 +9,7 @@ def write(rel: str, content: str):
     path = ROOT / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content.strip() + "\n")
-    print(f"  wrote {rel}")
+    # print(f"  wrote {rel}")
 
 # Copy crud base to ventas
 write("ms-ventas/app/crud/base.py", (ROOT / "ms-compras/app/crud/base.py").read_text())
@@ -133,4 +133,4 @@ class FacturaResponse(AuditoriaResponse):
     detalles: list[DetalleResponse] = []
 ''')
 
-print("Done ventas schemas")
+# print("Done ventas schemas")

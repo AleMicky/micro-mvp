@@ -17,7 +17,7 @@ class ClienteService:
             .options(selectinload(Cliente.historial), selectinload(Cliente.puntos))
         )
 
-        print("Executing query>>>>:", stmt)  # Debugging line to print the query
+        # print("Executing query>>>>:", stmt)  # Debugging line to print the query
         return (await db.execute(stmt)).scalar_one_or_none()
 
     async def get_all(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> list[Cliente]:
