@@ -261,7 +261,7 @@ function openDeleteProducto(item: Producto) {
 async function saveProducto() {
   if (!(await productoFormRef.value?.validate())?.valid) return
   if (!productoForm.categoria_id || !productoForm.unidad_medida_id) {
-    appStore.showError('Seleccione categoría y unidad de medida')
+    appStore.showError('Seleccione unidad de medida')
     return
   }
   savingProducto.value = true
@@ -696,16 +696,6 @@ onMounted(async () => {
               </v-col>
               <v-col cols="12">
                 <v-textarea v-model="productoForm.descripcion" label="Descripción" rows="2" />
-              </v-col>
-              <v-col cols="12" sm="6">
-                <v-select
-                  v-model="productoForm.categoria_id"
-                  :items="categorias"
-                  item-title="nombre"
-                  item-value="id"
-                  label="Categoría"
-                  :rules="[requiredRule]"
-                />
               </v-col>
               <v-col cols="12" sm="6">
                 <v-select
