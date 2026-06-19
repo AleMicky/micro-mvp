@@ -131,7 +131,7 @@ async def handle_agencias(conversacion: ChatbotConversacion, texto: str) -> Resu
     almacenes = await inventario_client.listar_almacenes()
     if not almacenes:
         return ResultadoBot(
-            respuesta="Por el momento no tenemos agencias disponibles.",
+            respuesta="❌ Por el momento no tenemos agencias disponibles.",
             opciones=bot_config.OPCIONES_MENU,
             nuevo_estado="menu",
             nuevo_contexto={},
@@ -149,7 +149,7 @@ async def handle_agencias(conversacion: ChatbotConversacion, texto: str) -> Resu
     ]
     nombres = [a["nombre"] for a in opciones_contexto]
     return ResultadoBot(
-        respuesta="Selecciona una agencia escribiendo su número o nombre:",
+        respuesta="🏬 Selecciona una agencia escribiendo su número o nombre:",
         opciones=nombres,
         nuevo_estado="agencias",
         nuevo_contexto={"agencias": opciones_contexto},
@@ -160,7 +160,7 @@ async def _mostrar_categorias(almacen_id: int, agencia_nombre: str) -> Resultado
     categorias = await catalogos_client.listar_categorias()
     if not categorias:
         return ResultadoBot(
-            respuesta="Por el momento no tenemos categorías disponibles.",
+            respuesta="❌ Por el momento no tenemos categorías disponibles.",
             opciones=bot_config.OPCIONES_MENU,
             nuevo_estado="menu",
             nuevo_contexto={},
@@ -169,7 +169,7 @@ async def _mostrar_categorias(almacen_id: int, agencia_nombre: str) -> Resultado
     opciones_contexto = [{"id": c["id"], "nombre": c["nombre"]} for c in categorias]
     nombres = [c["nombre"] for c in opciones_contexto]
     return ResultadoBot(
-        respuesta=f"Agencia {agencia_nombre}.\nSelecciona una categoría escribiendo su número o nombre:",
+        respuesta=f"🏬 Agencia {agencia_nombre}.\n🗂️ Selecciona una categoría escribiendo su número o nombre:",
         opciones=nombres,
         nuevo_estado="catalogo_categorias",
         nuevo_contexto={

@@ -55,6 +55,11 @@ async function cargarMensajes(conversacionId: number) {
   }
 }
 
+const botEscribiendo = computed(() => {
+  if (!mensajes.value.length) return false
+  return mensajes.value[mensajes.value.length - 1].direccion === 'entrante'
+})
+
 async function scrollAlFinal() {
   await nextTick()
   hiloContainer.value?.scrollTo({ top: hiloContainer.value.scrollHeight, behavior: 'smooth' })
@@ -144,6 +149,13 @@ onUnmounted(() => {
           </div>
           <div v-if="cargandoMensajes && !mensajes.length" class="bandeja__estado-vacio">
             Cargando mensajes...
+          </div>
+          <div v-if="botEscribiendo" class="bandeja__fila bandeja__fila--saliente">
+            <div class="bandeja__burbuja bandeja__burbuja--saliente bandeja__burbuja--typing">
+              <span class="bandeja__typing-dot" />
+              <span class="bandeja__typing-dot" />
+              <span class="bandeja__typing-dot" />
+            </div>
           </div>
         </div>
       </template>
@@ -345,6 +357,41 @@ onUnmounted(() => {
   font-size: 0.6875rem;
   color: #94a3b8;
   align-self: flex-end;
+}
+
+.bandeja__burbuja--typing {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.bandeja__typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6b7280;
+  opacity: 0.4;
+  animation: bandeja-typing-bounce 1.2s infinite ease-in-out;
+}
+
+.bandeja__typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.bandeja__typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bandeja-typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
 
 .bandeja__estado-vacio {

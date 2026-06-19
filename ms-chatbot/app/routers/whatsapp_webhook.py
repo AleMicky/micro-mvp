@@ -60,6 +60,9 @@ async def _procesar_mensaje_entrante(db: AsyncSession, message: dict) -> None:
         logger.info("Tipo de mensaje no soportado: %s de %s", message.get("type"), from_numero)
         return
 
+    if message_id:
+        await whatsapp_client.marcar_como_leido_con_typing(message_id)
+
     conversacion = await conversacion_service.get_or_create_whatsapp(db, from_numero)
     await mensaje_service.crear(db, conversacion.id, "entrante", texto, wa_message_id=message_id)
 

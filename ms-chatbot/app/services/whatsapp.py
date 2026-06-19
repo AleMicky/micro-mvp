@@ -33,6 +33,15 @@ class WhatsAppClient:
             logger.warning("Error enviando mensaje a WhatsApp: %s", exc)
             return {"error": str(exc)}
 
+    async def marcar_como_leido_con_typing(self, message_id: str) -> dict:
+        payload = {
+            "messaging_product": "whatsapp",
+            "status": "read",
+            "message_id": message_id,
+            "typing_indicator": {"type": "text"},
+        }
+        return await self._enviar(payload)
+
     async def enviar_texto(self, to: str, mensaje: str) -> dict:
         payload = {
             "messaging_product": "whatsapp",
