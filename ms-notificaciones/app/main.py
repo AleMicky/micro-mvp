@@ -21,6 +21,12 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    if settings.run_seed:
+        from app.seed import run_seed
+
+        logger.info("Ejecutando seed ms-notificaciones...")
+        await run_seed()
+
     if settings.rabbitmq_url:
         for attempt in range(10):
             try:

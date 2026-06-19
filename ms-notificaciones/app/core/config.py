@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://notif_user:notif_secret@localhost:5441/notificaciones_db"
     service_name: str = "ms-notificaciones"
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
+    run_seed: bool = False
 
 
 settings = Settings()

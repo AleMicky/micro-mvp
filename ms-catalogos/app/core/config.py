@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://catalogos_user:catalogos_secret@localhost:5432/catalogos_db"
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
+    run_seed: bool = False
 
 
 settings = Settings()
