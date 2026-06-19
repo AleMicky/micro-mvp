@@ -134,6 +134,76 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-company:
+    image: postgres:16-alpine
+    container_name: postgres-company
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_COMPANY_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_COMPANY_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_COMPANY_DB}
+    ports:
+      - "${POSTGRES_COMPANY_PORT}:5432"
+    volumes:
+      - postgres_company_data:/var/lib/postgresql/data
+      - ./ms-company/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_COMPANY_USER} -d ${POSTGRES_COMPANY_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-clientes:
+    image: postgres:16-alpine
+    container_name: postgres-clientes
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_CLIENTES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_CLIENTES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_CLIENTES_DB}
+    ports:
+      - "${POSTGRES_CLIENTES_PORT}:5432"
+    volumes:
+      - postgres_clientes_data:/var/lib/postgresql/data
+      - ./ms-clientes/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_CLIENTES_USER} -d ${POSTGRES_CLIENTES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-notificaciones:
+    image: postgres:16-alpine
+    container_name: postgres-notificaciones
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_NOTIFICACIONES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_NOTIFICACIONES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_NOTIFICACIONES_DB}
+    ports:
+      - "${POSTGRES_NOTIFICACIONES_PORT}:5432"
+    volumes:
+      - postgres_notificaciones_data:/var/lib/postgresql/data
+      - ./ms-notificaciones/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_NOTIFICACIONES_USER} -d ${POSTGRES_NOTIFICACIONES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   ms-catalogos:
     build:
       context: ./ms-catalogos
@@ -144,10 +214,13 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-catalogos:5432/${POSTGRES_DB}
+      RABBITMQ_URL: ${RABBITMQ_URL}
     ports:
       - "${MS_CATALOGOS_PORT}:8001"
     depends_on:
       postgres-catalogos:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
@@ -169,12 +242,16 @@ services:
       SERVICE_NAME: ms-inventario
       RUN_SEED: "true"
       MS_CATALOGOS_URL: http://ms-catalogos:8001
+      MS_COMPANY_URL: http://ms-company:8008
+      RABBITMQ_URL: ${RABBITMQ_URL}
     ports:
       - "${MS_INVENTARIO_PORT}:8002"
     depends_on:
       postgres-inventario:
         condition: service_healthy
       ms-catalogos:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
@@ -277,8 +354,11 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_VENTAS_USER}:${POSTGRES_VENTAS_PASSWORD}@postgres-ventas:5432/${POSTGRES_VENTAS_DB}
       SERVICE_NAME: ms-ventas
       RUN_SEED: "true"
+      MS_CATALOGOS_URL: http://ms-catalogos:8001
       MS_INVENTARIO_URL: http://ms-inventario:8002
       MS_FINANZAS_URL: http://ms-finanzas:8006
+      MS_CLIENTES_URL: http://ms-clientes:8009
+      RABBITMQ_URL: ${RABBITMQ_URL}
     ports:
       - "${MS_VENTAS_PORT}:8005"
     depends_on:
@@ -287,6 +367,12 @@ services:
       ms-inventario:
         condition: service_healthy
       ms-finanzas:
+        condition: service_healthy
+      ms-clientes:
+        condition: service_healthy
+      ms-catalogos:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
@@ -333,6 +419,83 @@ services:
       retries: 3
       start_period: 25s
 
+  ms-company:
+    build:
+      context: ./ms-company
+      dockerfile: Dockerfile
+    container_name: ms-company
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_COMPANY_USER}:${POSTGRES_COMPANY_PASSWORD}@postgres-company:5432/${POSTGRES_COMPANY_DB}
+      SERVICE_NAME: ms-company
+      RUN_SEED: "true"
+    ports:
+      - "${MS_COMPANY_PORT}:8008"
+    depends_on:
+      postgres-company:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  ms-clientes:
+    build:
+      context: ./ms-clientes
+      dockerfile: Dockerfile
+    container_name: ms-clientes
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_CLIENTES_USER}:${POSTGRES_CLIENTES_PASSWORD}@postgres-clientes:5432/${POSTGRES_CLIENTES_DB}
+      SERVICE_NAME: ms-clientes
+      RUN_SEED: "true"
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    ports:
+      - "${MS_CLIENTES_PORT}:8009"
+    depends_on:
+      postgres-clientes:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  ms-notificaciones:
+    build:
+      context: ./ms-notificaciones
+      dockerfile: Dockerfile
+    container_name: ms-notificaciones
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_NOTIFICACIONES_USER}:${POSTGRES_NOTIFICACIONES_PASSWORD}@postgres-notificaciones:5432/${POSTGRES_NOTIFICACIONES_DB}
+      SERVICE_NAME: ms-notificaciones
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    ports:
+      - "${MS_NOTIFICACIONES_PORT}:8010"
+    depends_on:
+      postgres-notificaciones:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -349,6 +512,9 @@ services:
       MS_VENTAS_URL: http://ms-ventas:8005
       MS_FINANZAS_URL: http://ms-finanzas:8006
       MS_REPORTES_URL: http://ms-reportes:8007
+      MS_COMPANY_URL: http://ms-company:8008
+      MS_CLIENTES_URL: http://ms-clientes:8009
+      MS_NOTIFICACIONES_URL: http://ms-notificaciones:8010
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
     ports:
@@ -367,6 +533,12 @@ services:
       ms-finanzas:
         condition: service_healthy
       ms-reportes:
+        condition: service_healthy
+      ms-company:
+        condition: service_healthy
+      ms-clientes:
+        condition: service_healthy
+      ms-notificaciones:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -395,3 +567,6 @@ volumes:
   postgres_ventas_data:
   postgres_finanzas_data:
   postgres_reportes_data:
+  postgres_company_data:
+  postgres_clientes_data:
+  postgres_notificaciones_data:

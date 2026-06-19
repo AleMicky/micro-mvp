@@ -1,10 +1,13 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class EstadoDocumento(str, Enum):
+class EstadoOrdenCompra(StrEnum):
     BORRADOR = "BORRADOR"
-    PENDIENTE = "PENDIENTE"
     APROBADA = "APROBADA"
-    RECHAZADA = "RECHAZADA"
-    RECIBIDA = "RECIBIDA"
+    CANCELADA = "CANCELADA"
+
+
+class EstadoRecepcionCompra(StrEnum):
+    BORRADOR = "BORRADOR"
+    CONFIRMADA = "CONFIRMADA"
     CANCELADA = "CANCELADA"

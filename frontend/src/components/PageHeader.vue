@@ -7,9 +7,9 @@ defineProps<{
 </script>
 
 <template>
-  <div class="page-header mb-6">
+  <div class="page-header">
     <div class="d-flex align-center ga-3">
-      <v-avatar v-if="icon" color="primary" variant="tonal" size="48" rounded="lg">
+      <v-avatar v-if="icon" color="primary" variant="tonal" size="40" rounded="lg">
         <v-icon :icon="icon" />
       </v-avatar>
       <div>
@@ -30,20 +30,23 @@ defineProps<{
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+  margin-bottom: 24px;
 }
 
 .page-header__title {
   margin: 0;
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  line-height: 1.2;
-  color: rgb(var(--v-theme-on-background));
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: #0f172a;
 }
 
 .page-header__subtitle {
-  margin: 4px 0 0;
-  color: rgba(var(--v-theme-on-background), 0.62);
-  font-size: 0.95rem;
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 .page-header__actions {

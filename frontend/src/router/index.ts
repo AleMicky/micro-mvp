@@ -28,6 +28,33 @@ const router = createRouter({
           component: () => import('@/views/dashboard/DashboardView.vue'),
         },
         {
+          path: 'company/empresas',
+          name: 'empresas',
+          component: () => import('@/views/company/EmpresasView.vue'),
+        },
+        { path: 'company/companias', redirect: { name: 'empresas' } },
+        { path: 'company/sucursales', redirect: { name: 'empresas' } },
+        {
+          path: 'clientes/lista',
+          name: 'clientes-lista',
+          component: () => import('@/views/clientes/ClientesView.vue'),
+        },
+        {
+          path: 'clientes/historial',
+          name: 'clientes-historial',
+          component: () => import('@/views/clientes/HistorialClienteView.vue'),
+        },
+        {
+          path: 'clientes/puntos',
+          name: 'clientes-puntos',
+          component: () => import('@/views/clientes/PuntosClienteView.vue'),
+        },
+        {
+          path: 'notificaciones',
+          name: 'notificaciones',
+          component: () => import('@/views/notificaciones/NotificacionesView.vue'),
+        },
+        {
           path: 'catalogos/categorias',
           name: 'categorias',
           component: () => import('@/views/catalogos/CategoriasView.vue'),
@@ -106,7 +133,7 @@ const router = createRouter({
         { path: 'compras/cotizaciones', name: 'cotizaciones-compra', component: () => import('@/views/compras/CotizacionesCompraView.vue') },
         { path: 'compras/ordenes', name: 'ordenes-compra', component: () => import('@/views/compras/OrdenesCompraView.vue') },
         { path: 'compras/recepciones', name: 'recepciones-compra', component: () => import('@/views/compras/RecepcionesCompraView.vue') },
-        { path: 'ventas/clientes', name: 'clientes', component: () => import('@/views/ventas/ClientesView.vue') },
+        { path: 'ventas/clientes', redirect: { name: 'clientes-lista' } },
         { path: 'ventas/cotizaciones', name: 'cotizaciones-venta', component: () => import('@/views/ventas/CotizacionesVentaView.vue') },
         { path: 'ventas/ventas', name: 'ventas', component: () => import('@/views/ventas/VentasView.vue') },
         { path: 'ventas/facturas', name: 'facturas', component: () => import('@/views/ventas/FacturasView.vue') },
@@ -123,6 +150,8 @@ const router = createRouter({
         { path: 'reportes/ventas', name: 'reporte-ventas', component: () => import('@/views/reportes/ReporteVentasView.vue') },
         { path: 'reportes/financiero', name: 'reporte-financiero', component: () => import('@/views/reportes/ReporteFinancieroView.vue') },
         { path: 'reportes/exportar', name: 'exportar-reportes', component: () => import('@/views/reportes/ExportReportesView.vue') },
+        { path: 'reportes/stock-consolidado', name: 'reporte-stock-consolidado', component: () => import('@/views/reportes/ReporteStockConsolidadoView.vue') },
+        { path: 'reportes/ventas-dia', name: 'reporte-ventas-dia', component: () => import('@/views/reportes/ReporteVentasDiaView.vue') },
       ],
     },
     {

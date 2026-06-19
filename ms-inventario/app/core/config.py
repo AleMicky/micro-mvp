@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     service_name: str = "ms-inventario"
     run_seed: bool = False
     ms_catalogos_url: str = "http://localhost:8001"
+    ms_company_url: str = "http://localhost:8008"
+    rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
 
 
 settings = Settings()

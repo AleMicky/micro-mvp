@@ -9,15 +9,12 @@ from app.models import (
     CotizacionCompra,
     CotizacionCompraDetalle,
     OrdenCompra,
-    OrdenCompraDetalle,
     Proveedor,
     RecepcionCompra,
 )
 from app.schemas.compras import (
     CotizacionCompraCreate,
     CotizacionCompraUpdate,
-    OrdenCompraCreate,
-    OrdenCompraUpdate,
     ProveedorCreate,
     ProveedorUpdate,
 )
@@ -134,62 +131,6 @@ class CRUDOrden:
         )
         result = await db.execute(stmt)
         return list(result.scalars().all())
-
-    async def create(self, db: AsyncSession, payload: OrdenCompraCreate) -> OrdenCompra:
-        codigo = await _next_codigo(db, "OC", OrdenCompra)
-        total = sum(_calc_subtotal(d.cantidad, d.precio_unitario) for d in payload.detalles)
-        orden = OrdenCompra(
-            codigo=codigo,
-            proveedor_id=payload.proveedor_id,
-            cotizacion_id=payload.cotizacion_id,
-            estado=payload.estado,
-            fecha=payload.fecha,
-            observaciones=payload.observaciones,
-            total=total,
-        )
-        db.add(orden)
-        await db.flush()
-        for d in payload.detalles:
-            db.add(
-                OrdenCompraDetalle(
-                    orden_id=orden.id,
-                    producto_id=d.producto_id,
-                    cantidad=d.cantidad,
-                    precio_unitario=d.precio_unitario,
-                    subtotal=_calc_subtotal(d.cantidad, d.precio_unitario),
-                )
-            )
-        await db.commit()
-        return await self.get(db, orden.id)  # type: ignore
-
-    async def update(self, db: AsyncSession, orden: OrdenCompra, payload: OrdenCompraUpdate) -> OrdenCompra:
-        for field in ("proveedor_id", "cotizacion_id", "fecha", "observaciones", "estado", "activo"):
-            val = getattr(payload, field)
-            if val is not None:
-                setattr(orden, field, val)
-        if payload.detalles is not None:
-            for det in list(orden.detalles):
-                await db.delete(det)
-            total = Decimal("0")
-            for d in payload.detalles:
-                sub = _calc_subtotal(d.cantidad, d.precio_unitario)
-                total += sub
-                db.add(
-                    OrdenCompraDetalle(
-                        orden_id=orden.id,
-                        producto_id=d.producto_id,
-                        cantidad=d.cantidad,
-                        precio_unitario=d.precio_unitario,
-                        subtotal=sub,
-                    )
-                )
-            orden.total = total
-        await db.commit()
-        return await self.get(db, orden.id)  # type: ignore
-
-    async def delete(self, db: AsyncSession, orden: OrdenCompra) -> None:
-        await db.delete(orden)
-        await db.commit()
 
 
 class CRUDRecepcion:

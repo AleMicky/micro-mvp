@@ -87,9 +87,10 @@ class RecepcionCompra(Base, AuditoriaMixin):
     codigo: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     orden_id: Mapped[int] = mapped_column(ForeignKey("ordenes_compra.id"), nullable=False)
     almacen_id: Mapped[int] = mapped_column(nullable=False)
-    estado: Mapped[str] = mapped_column(String(20), default="RECIBIDA", nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), default="BORRADOR", nullable=False)
     fecha: Mapped[str | None] = mapped_column(String(10))
     observaciones: Mapped[str | None] = mapped_column(Text)
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
 
     orden: Mapped["OrdenCompra"] = relationship("OrdenCompra")
     detalles: Mapped[list["RecepcionCompraDetalle"]] = relationship(
@@ -103,6 +104,8 @@ class RecepcionCompraDetalle(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     recepcion_id: Mapped[int] = mapped_column(ForeignKey("recepciones_compra.id", ondelete="CASCADE"))
     producto_id: Mapped[int] = mapped_column(nullable=False)
-    cantidad: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    cantidad_recibida: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    costo_unitario: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
 
     recepcion: Mapped["RecepcionCompra"] = relationship("RecepcionCompra", back_populates="detalles")

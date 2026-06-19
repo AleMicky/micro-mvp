@@ -62,9 +62,10 @@ CREATE TABLE IF NOT EXISTS recepciones_compra (
     codigo VARCHAR(50) UNIQUE NOT NULL,
     orden_id INTEGER NOT NULL REFERENCES ordenes_compra(id),
     almacen_id INTEGER NOT NULL,
-    estado VARCHAR(20) NOT NULL DEFAULT 'RECIBIDA',
+    estado VARCHAR(20) NOT NULL DEFAULT 'BORRADOR',
     fecha VARCHAR(10),
     observaciones TEXT,
+    total NUMERIC(14,2) NOT NULL DEFAULT 0,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -74,5 +75,7 @@ CREATE TABLE IF NOT EXISTS recepcion_compra_detalles (
     id SERIAL PRIMARY KEY,
     recepcion_id INTEGER NOT NULL REFERENCES recepciones_compra(id) ON DELETE CASCADE,
     producto_id INTEGER NOT NULL,
-    cantidad NUMERIC(14,4) NOT NULL
+    cantidad_recibida NUMERIC(14,4) NOT NULL,
+    costo_unitario NUMERIC(14,2) NOT NULL,
+    subtotal NUMERIC(14,2) NOT NULL
 );

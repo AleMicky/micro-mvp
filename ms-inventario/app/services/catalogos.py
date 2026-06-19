@@ -27,5 +27,21 @@ class CatalogosClient:
                 detail=f"Error al validar producto en ms-catalogos: {response.status_code}",
             )
 
+    async def obtener_por_codigo(self, codigo: str) -> dict:
+        url = f"{settings.ms_catalogos_url}/productos/codigo/{codigo}"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(url)
+        except httpx.RequestError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"No se pudo contactar ms-catalogos: {exc}",
+            ) from exc
+        if response.status_code == status.HTTP_404_NOT_FOUND:
+            raise HTTPException(status_code=404, detail=f"Producto con código {codigo} no encontrado")
+        if response.status_code >= 400:
+            raise HTTPException(status_code=502, detail="Error al consultar producto")
+        return response.json()
+
 
 catalogos_client = CatalogosClient()

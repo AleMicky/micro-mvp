@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class AuditoriaSchema(BaseModel):
@@ -44,7 +44,7 @@ class ProveedorResponse(ProveedorBase, AuditoriaResponse):
     id: int
 
 
-# ── Detalle cotización ─────────────────────────────────────
+# ── Detalle cotización (módulo existente) ──────────────────
 
 class CotizacionDetalleBase(BaseModel):
     producto_id: int
@@ -61,8 +61,6 @@ class CotizacionDetalleResponse(CotizacionDetalleBase):
     id: int
     subtotal: Decimal
 
-
-# ── Cotización ─────────────────────────────────────────────
 
 class CotizacionCompraBase(BaseModel):
     proveedor_id: int
@@ -92,87 +90,144 @@ class CotizacionCompraResponse(CotizacionCompraBase, AuditoriaResponse):
     detalles: list[CotizacionDetalleResponse] = []
 
 
-# ── Detalle orden ──────────────────────────────────────────
+# ── Orden de compra ────────────────────────────────────────
 
-class OrdenDetalleBase(BaseModel):
-    producto_id: int
+class OrdenCompraDetalleCreate(BaseModel):
+    producto_id: int = Field(..., gt=0)
     cantidad: Decimal = Field(..., gt=0)
     precio_unitario: Decimal = Field(..., ge=0)
 
 
-class OrdenDetalleCreate(OrdenDetalleBase):
-    pass
-
-
-class OrdenDetalleResponse(OrdenDetalleBase):
+class OrdenCompraDetalleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    producto_id: int
+    cantidad: Decimal
+    precio_unitario: Decimal
     subtotal: Decimal
 
 
-# ── Orden compra ───────────────────────────────────────────
-
-class OrdenCompraBase(BaseModel):
-    proveedor_id: int
+class OrdenCompraCreate(BaseModel):
+    proveedor_id: int = Field(..., gt=0)
     cotizacion_id: int | None = None
     fecha: str | None = None
-    observaciones: str | None = None
-    estado: str = "BORRADOR"
+    observacion: str | None = None
+    detalles: list[OrdenCompraDetalleCreate] = Field(..., min_length=1)
 
-
-class OrdenCompraCreate(OrdenCompraBase):
-    detalles: list[OrdenDetalleCreate] = Field(..., min_length=1)
+    @field_validator("detalles")
+    @classmethod
+    def validar_total_positivo(cls, detalles: list[OrdenCompraDetalleCreate]) -> list[OrdenCompraDetalleCreate]:
+        total = sum(d.cantidad * d.precio_unitario for d in detalles)
+        if total < 0:
+            raise ValueError("El total de la orden no puede ser negativo")
+        return detalles
 
 
 class OrdenCompraUpdate(BaseModel):
-    proveedor_id: int | None = None
+    proveedor_id: int | None = Field(None, gt=0)
     cotizacion_id: int | None = None
     fecha: str | None = None
-    observaciones: str | None = None
-    estado: str | None = None
-    activo: bool | None = None
-    detalles: list[OrdenDetalleCreate] | None = None
+    observacion: str | None = None
+    detalles: list[OrdenCompraDetalleCreate] | None = None
+
+    @field_validator("detalles")
+    @classmethod
+    def validar_total_positivo(
+        cls, detalles: list[OrdenCompraDetalleCreate] | None
+    ) -> list[OrdenCompraDetalleCreate] | None:
+        if detalles is None:
+            return detalles
+        total = sum(d.cantidad * d.precio_unitario for d in detalles)
+        if total < 0:
+            raise ValueError("El total de la orden no puede ser negativo")
+        return detalles
 
 
-class OrdenCompraResponse(OrdenCompraBase, AuditoriaResponse):
-    model_config = ConfigDict(from_attributes=True)
+class OrdenCompraResponse(AuditoriaResponse):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     id: int
     codigo: str
+    proveedor_id: int
+    cotizacion_id: int | None = None
+    estado: str
+    fecha: str | None = None
+    observacion: str | None = Field(None, validation_alias="observaciones")
     total: Decimal
-    detalles: list[OrdenDetalleResponse] = []
+    detalles: list[OrdenCompraDetalleResponse] = []
 
 
-# ── Recepción ──────────────────────────────────────────────
-
-class RecepcionDetalleBase(BaseModel):
-    producto_id: int
-    cantidad: Decimal = Field(..., gt=0)
+# Alias retrocompatibles
+OrdenDetalleCreate = OrdenCompraDetalleCreate
+OrdenDetalleResponse = OrdenCompraDetalleResponse
 
 
-class RecepcionDetalleCreate(RecepcionDetalleBase):
-    pass
+# ── Recepción de compra ────────────────────────────────────
+
+class RecepcionCompraDetalleCreate(BaseModel):
+    producto_id: int = Field(..., gt=0)
+    cantidad_recibida: Decimal = Field(..., gt=0)
+    costo_unitario: Decimal = Field(..., ge=0)
 
 
-class RecepcionDetalleResponse(RecepcionDetalleBase):
+class RecepcionCompraDetalleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    producto_id: int
+    cantidad_recibida: Decimal
+    costo_unitario: Decimal
+    subtotal: Decimal
 
 
 class RecepcionCompraCreate(BaseModel):
-    orden_id: int
-    almacen_id: int
+    orden_compra_id: int = Field(..., gt=0)
+    almacen_id: int = Field(..., gt=0)
     fecha: str | None = None
-    observaciones: str | None = None
-    detalles: list[RecepcionDetalleCreate] = Field(..., min_length=1)
+    observacion: str | None = None
+    detalles: list[RecepcionCompraDetalleCreate] = Field(..., min_length=1)
+
+    @field_validator("detalles")
+    @classmethod
+    def validar_total_positivo(
+        cls, detalles: list[RecepcionCompraDetalleCreate]
+    ) -> list[RecepcionCompraDetalleCreate]:
+        total = sum(d.cantidad_recibida * d.costo_unitario for d in detalles)
+        if total < 0:
+            raise ValueError("El total de la recepción no puede ser negativo")
+        return detalles
+
+
+class RecepcionCompraUpdate(BaseModel):
+    almacen_id: int | None = Field(None, gt=0)
+    fecha: str | None = None
+    observacion: str | None = None
+    detalles: list[RecepcionCompraDetalleCreate] | None = None
+
+    @field_validator("detalles")
+    @classmethod
+    def validar_total_positivo(
+        cls, detalles: list[RecepcionCompraDetalleCreate] | None
+    ) -> list[RecepcionCompraDetalleCreate] | None:
+        if detalles is None:
+            return detalles
+        total = sum(d.cantidad_recibida * d.costo_unitario for d in detalles)
+        if total < 0:
+            raise ValueError("El total de la recepción no puede ser negativo")
+        return detalles
 
 
 class RecepcionCompraResponse(AuditoriaResponse):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     id: int
     codigo: str
-    orden_id: int
+    orden_compra_id: int = Field(validation_alias="orden_id")
     almacen_id: int
     estado: str
-    fecha: str | None
-    observaciones: str | None
-    detalles: list[RecepcionDetalleResponse] = []
+    fecha: str | None = None
+    observacion: str | None = Field(None, validation_alias="observaciones")
+    total: Decimal
+    detalles: list[RecepcionCompraDetalleResponse] = []
+
+
+# Alias retrocompatibles
+RecepcionDetalleCreate = RecepcionCompraDetalleCreate
+RecepcionDetalleResponse = RecepcionCompraDetalleResponse

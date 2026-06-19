@@ -18,6 +18,7 @@ CREATE TABLE almacenes (
     codigo          VARCHAR(50)     NOT NULL,
     nombre          VARCHAR(150)    NOT NULL,
     direccion       TEXT,
+    sucursal_id     INTEGER,
     activo          BOOLEAN         NOT NULL DEFAULT TRUE,
     creado_en       TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     actualizado_en  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),

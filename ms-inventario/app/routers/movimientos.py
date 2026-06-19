@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -39,6 +39,30 @@ async def listar_movimientos_por_almacen(
     return await crud_movimiento.get_all(
         db, skip=skip, limit=limit, almacen_id=almacen_id
     )
+
+
+@router.get("/kardex/producto/{producto_id}/sucursal/{sucursal_id}", response_model=KardexResponse)
+async def obtener_kardex_producto_sucursal(
+    producto_id: int,
+    sucursal_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(500, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy import select
+    from app.models.almacen import Almacen
+
+    stmt = select(Almacen.id).where(Almacen.sucursal_id == sucursal_id)
+    almacen_ids = list((await db.execute(stmt)).scalars().all())
+    if not almacen_ids:
+        raise HTTPException(status_code=404, detail="Sucursal sin almacén asociado")
+    movimientos = []
+    for aid in almacen_ids:
+        movimientos.extend(
+            await crud_movimiento.get_all(db, producto_id=producto_id, almacen_id=aid, limit=limit)
+        )
+    movimientos.sort(key=lambda m: m.creado_en)
+    return KardexResponse(producto_id=producto_id, total_movimientos=len(movimientos), movimientos=movimientos)
 
 
 @router.get("/kardex/producto/{producto_id}", response_model=KardexResponse)

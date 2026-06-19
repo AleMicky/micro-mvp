@@ -1,12 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
-from decimal import Decimal
 
 from fastapi import FastAPI
 
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.routers import cotizaciones, health, ordenes, proveedores, recepciones
+from app.routers import cotizaciones, health, ordenes, ordenes_compra, proveedores, recepciones, recepciones_compra
 
 logger = logging.getLogger(__name__)
 
@@ -34,4 +33,6 @@ app.include_router(health.router)
 app.include_router(proveedores.router)
 app.include_router(cotizaciones.router)
 app.include_router(ordenes.router)
+app.include_router(ordenes_compra.router)
 app.include_router(recepciones.router)
+app.include_router(recepciones_compra.router)

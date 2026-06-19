@@ -25,7 +25,7 @@ export default createVuetify({
           info: '#0EA5E9',
           success: '#22C55E',
           warning: '#F59E0B',
-          background: '#F0F4F8',
+          background: '#F1F5F9',
           surface: '#FFFFFF',
           'surface-variant': '#F8FAFC',
           'on-surface-variant': '#475569',

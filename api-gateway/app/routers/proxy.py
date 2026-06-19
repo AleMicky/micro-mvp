@@ -121,3 +121,71 @@ async def proxy_finanzas(path: str, request: Request) -> Response:
 async def proxy_reportes(path: str, request: Request) -> Response:
     target_url = f"{settings.ms_reportes_url}/{path}"
     return await _proxy_request(target_url, request)
+
+
+@router.api_route(
+    "/companias",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_companias_root(request: Request) -> Response:
+    return await _proxy_request(f"{settings.ms_company_url}/companias", request)
+
+
+@router.api_route(
+    "/companias/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_companias(path: str, request: Request) -> Response:
+    target_url = f"{settings.ms_company_url}/companias/{path}"
+    return await _proxy_request(target_url, request)
+
+
+@router.api_route(
+    "/sucursales",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_sucursales_root(request: Request) -> Response:
+    return await _proxy_request(f"{settings.ms_company_url}/sucursales", request)
+
+
+@router.api_route(
+    "/sucursales/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_sucursales(path: str, request: Request) -> Response:
+    target_url = f"{settings.ms_company_url}/sucursales/{path}"
+    return await _proxy_request(target_url, request)
+
+
+@router.api_route(
+    "/clientes",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_clientes_root(request: Request) -> Response:
+    return await _proxy_request(f"{settings.ms_clientes_url}/clientes", request)
+
+
+@router.api_route(
+    "/clientes/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_clientes(path: str, request: Request) -> Response:
+    target_url = f"{settings.ms_clientes_url}/clientes/{path}"
+    return await _proxy_request(target_url, request)
+
+
+@router.api_route(
+    "/notificaciones",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_notificaciones_root(request: Request) -> Response:
+    return await _proxy_request(f"{settings.ms_notificaciones_url}/notificaciones", request)
+
+
+@router.api_route(
+    "/notificaciones/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_notificaciones(path: str, request: Request) -> Response:
+    target_url = f"{settings.ms_notificaciones_url}/notificaciones/{path}"
+    return await _proxy_request(target_url, request)

@@ -25,6 +25,23 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { title: 'Dashboard', icon: 'mdi-view-dashboard-outline', to: '/dashboard' },
+  { title: 'Empresas', icon: 'mdi-domain', to: '/company/empresas' },
+  {
+    title: 'Clientes',
+    icon: 'mdi-account-group-outline',
+    children: [
+      { title: 'Clientes', icon: 'mdi-account-outline', to: '/clientes/lista' },
+      { title: 'Historial', icon: 'mdi-history', to: '/clientes/historial' },
+      { title: 'Puntos', icon: 'mdi-star-outline', to: '/clientes/puntos' },
+    ],
+  },
+  {
+    title: 'Notificaciones',
+    icon: 'mdi-bell-outline',
+    children: [
+      { title: 'Notificaciones', icon: 'mdi-bell-ring-outline', to: '/notificaciones' },
+    ],
+  },
   {
     title: 'Seguridad',
     icon: 'mdi-shield-account-outline',
@@ -72,7 +89,6 @@ const menuItems: MenuItem[] = [
     title: 'Ventas',
     icon: 'mdi-cart-arrow-up',
     children: [
-      { title: 'Clientes', icon: 'mdi-account-outline', to: '/ventas/clientes' },
       { title: 'Cotizaciones de venta', icon: 'mdi-file-document-edit-outline', to: '/ventas/cotizaciones' },
       { title: 'Ventas', icon: 'mdi-cash-register', to: '/ventas/ventas' },
       { title: 'Facturas', icon: 'mdi-receipt-text-outline', to: '/ventas/facturas' },
@@ -100,6 +116,8 @@ const menuItems: MenuItem[] = [
       { title: 'Reporte de compras', icon: 'mdi-cart-arrow-down', to: '/reportes/compras' },
       { title: 'Reporte de ventas', icon: 'mdi-cart-arrow-up', to: '/reportes/ventas' },
       { title: 'Reporte financiero', icon: 'mdi-finance', to: '/reportes/financiero' },
+      { title: 'Stock consolidado', icon: 'mdi-package-variant', to: '/reportes/stock-consolidado' },
+      { title: 'Ventas del día', icon: 'mdi-calendar-today', to: '/reportes/ventas-dia' },
       { title: 'Exportar PDF / Excel', icon: 'mdi-download', to: '/reportes/exportar' },
     ],
   },
@@ -118,6 +136,10 @@ function isActive(to?: string) {
   return to ? route.path === to : false
 }
 
+function isGroupActive(item: MenuItem) {
+  return item.children?.some((child) => child.to && route.path.startsWith(child.to)) ?? false
+}
+
 async function handleLogout() {
   await authStore.logout()
   router.push({ name: 'login' })
@@ -130,63 +152,257 @@ async function handleLogout() {
     app
     :permanent="!$vuetify.display.smAndDown"
     :temporary="$vuetify.display.smAndDown"
-    width="280"
+    width="272"
     class="sidebar"
-    border="end"
+    :border="false"
   >
-    <div class="sidebar-brand pa-5">
-      <v-avatar color="primary" size="42" rounded="lg" class="mr-3">
-        <v-icon icon="mdi-cube-outline" color="white" />
-      </v-avatar>
-      <div>
-        <div class="text-subtitle-1 font-weight-bold">Micro MVP</div>
-        <div class="text-caption text-medium-emphasis">Panel administrativo</div>
+    <div class="sidebar__brand">
+      <div class="sidebar__logo">
+        <v-icon icon="mdi-cube-outline" size="20" color="white" />
+      </div>
+      <div class="sidebar__brand-text">
+        <span class="sidebar__brand-name">Micro MVP</span>
+        <span class="sidebar__brand-tag">ERP Admin</span>
       </div>
     </div>
 
-    <v-divider />
-
-    <v-list v-model:opened="openedGroups" nav density="comfortable" class="py-3 px-3">
-      <template v-for="item in menuItems" :key="item.title">
-        <v-list-item
-          v-if="!item.children"
-          :to="item.to"
-          :prepend-icon="item.icon"
-          :title="item.title"
-          rounded="lg"
-          color="primary"
-          :active="isActive(item.to)"
-        />
-        <v-list-group v-else :value="item.title">
-          <template #activator="{ props: groupProps }">
-            <v-list-item v-bind="groupProps" :prepend-icon="item.icon" :title="item.title" rounded="lg" />
-          </template>
+    <div class="sidebar__nav">
+      <v-list v-model:opened="openedGroups" nav density="compact" class="sidebar__list">
+        <template v-for="item in menuItems" :key="item.title">
           <v-list-item
-            v-for="child in item.children"
-            :key="child.title"
-            :to="child.to"
-            :prepend-icon="child.icon"
-            :title="child.title"
-            rounded="lg"
-            color="primary"
-            class="sidebar-subitem"
-            :active="isActive(child.to)"
-          />
-        </v-list-group>
-      </template>
-    </v-list>
+            v-if="!item.children"
+            :to="item.to"
+            class="sidebar__item"
+            :class="{ 'sidebar__item--active': isActive(item.to) }"
+          >
+            <template #prepend>
+              <v-icon :icon="item.icon" size="18" class="sidebar__icon" />
+            </template>
+            <v-list-item-title class="sidebar__label">{{ item.title }}</v-list-item-title>
+          </v-list-item>
+
+          <v-list-group v-else :value="item.title" class="sidebar__group">
+            <template #activator="{ props: groupProps }">
+              <v-list-item
+                v-bind="groupProps"
+                class="sidebar__item sidebar__item--parent"
+                :class="{ 'sidebar__item--parent-active': isGroupActive(item) }"
+              >
+                <template #prepend>
+                  <v-icon :icon="item.icon" size="18" class="sidebar__icon" />
+                </template>
+                <v-list-item-title class="sidebar__label">{{ item.title }}</v-list-item-title>
+              </v-list-item>
+            </template>
+
+            <v-list-item
+              v-for="child in item.children"
+              :key="child.title"
+              :to="child.to"
+              class="sidebar__item sidebar__item--child"
+              :class="{ 'sidebar__item--active': isActive(child.to) }"
+            >
+              <template #prepend>
+                <span class="sidebar__dot" />
+              </template>
+              <v-list-item-title class="sidebar__label sidebar__label--child">{{ child.title }}</v-list-item-title>
+            </v-list-item>
+          </v-list-group>
+        </template>
+      </v-list>
+    </div>
 
     <template #append>
-      <v-divider />
-      <div class="pa-4">
-        <v-btn block variant="tonal" color="error" prepend-icon="mdi-logout" @click="handleLogout">Cerrar sesión</v-btn>
+      <div class="sidebar__footer">
+        <button type="button" class="sidebar__logout" @click="handleLogout">
+          <v-icon icon="mdi-logout" size="18" />
+          <span>Cerrar sesión</span>
+        </button>
       </div>
     </template>
   </v-navigation-drawer>
 </template>
 
 <style scoped>
-.sidebar { background: rgb(var(--v-theme-surface)); }
-.sidebar-brand { display: flex; align-items: center; }
-.sidebar-subitem { margin-left: 8px; }
+.sidebar {
+  background: #0f172a !important;
+  border-right: 1px solid #1e293b !important;
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px;
+  border-bottom: 1px solid #1e293b;
+  flex-shrink: 0;
+}
+
+.sidebar__logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #2563eb;
+  flex-shrink: 0;
+}
+
+.sidebar__brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar__brand-name {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.sidebar__brand-tag {
+  font-size: 0.6875rem;
+  color: #64748b;
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+
+.sidebar__nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar__nav::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+.sidebar__list {
+  padding: 0;
+  background: transparent;
+}
+
+.sidebar__list :deep(.v-list-group__items) {
+  --indent-padding: 0px;
+}
+
+.sidebar__list :deep(.v-list-group__header .v-list-item__append) {
+  color: #64748b;
+}
+
+.sidebar__item {
+  margin-bottom: 1px;
+  min-height: 36px !important;
+  padding-inline: 10px !important;
+  border-radius: 6px !important;
+  color: #94a3b8 !important;
+  transition: background 0.12s, color 0.12s;
+}
+
+.sidebar__item:hover {
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+}
+
+.sidebar__item--active {
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+.sidebar__item--active .sidebar__icon {
+  color: #60a5fa !important;
+}
+
+.sidebar__item--active .sidebar__dot {
+  background: #60a5fa;
+}
+
+.sidebar__item--parent-active {
+  color: #e2e8f0 !important;
+}
+
+.sidebar__item--parent-active .sidebar__icon {
+  color: #60a5fa !important;
+}
+
+.sidebar__item--child {
+  padding-inline-start: 28px !important;
+  min-height: 34px !important;
+}
+
+.sidebar__icon {
+  color: #64748b !important;
+  margin-inline-end: 10px !important;
+  opacity: 1 !important;
+}
+
+.sidebar__dot {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #475569;
+  margin-inline-end: 10px;
+  flex-shrink: 0;
+}
+
+.sidebar__label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  word-break: break-word;
+}
+
+.sidebar__label--child {
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.sidebar__item :deep(.v-list-item__overlay) {
+  opacity: 0 !important;
+}
+
+.sidebar__footer {
+  padding: 12px 10px 16px;
+  border-top: 1px solid #1e293b;
+  flex-shrink: 0;
+}
+
+.sidebar__logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.sidebar__logout:hover {
+  background: #1e293b;
+  color: #f87171;
+  border-color: #475569;
+}
 </style>

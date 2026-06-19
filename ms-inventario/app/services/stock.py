@@ -24,6 +24,7 @@ from app.schemas.stock import (
     StockTransferenciaRequest,
 )
 from app.services.catalogos import catalogos_client
+from app.events.publisher import publish_event
 
 
 class StockService:
@@ -124,6 +125,16 @@ class StockService:
         await db.refresh(existencia)
         await db.refresh(movimiento)
 
+        await publish_event(
+            "InventoryUpdated",
+            {"producto_id": existencia.producto_id, "almacen_id": existencia.almacen_id, "cantidad": float(cantidad_nueva)},
+        )
+        if existencia.stock_minimo and cantidad_nueva <= existencia.stock_minimo:
+            await publish_event(
+                "StockLow",
+                {"producto_id": existencia.producto_id, "almacen_id": existencia.almacen_id, "cantidad": float(cantidad_nueva)},
+            )
+
         return StockOperacionResponse(
             existencia_id=existencia.id,
             producto_id=existencia.producto_id,
@@ -171,6 +182,16 @@ class StockService:
         await db.commit()
         await db.refresh(existencia)
         await db.refresh(movimiento)
+
+        await publish_event(
+            "InventoryUpdated",
+            {"producto_id": existencia.producto_id, "almacen_id": existencia.almacen_id, "cantidad": float(cantidad_nueva)},
+        )
+        if existencia.stock_minimo and cantidad_nueva <= existencia.stock_minimo:
+            await publish_event(
+                "StockLow",
+                {"producto_id": existencia.producto_id, "almacen_id": existencia.almacen_id, "cantidad": float(cantidad_nueva)},
+            )
 
         return StockOperacionResponse(
             existencia_id=existencia.id,
@@ -372,6 +393,18 @@ class StockService:
 
         await db.commit()
         await db.refresh(transferencia)
+
+        for detalle in payload.detalles:
+            await publish_event(
+                "TransferCompleted",
+                {
+                    "transferencia_id": transferencia.id,
+                    "producto_id": detalle.producto_id,
+                    "cantidad": float(detalle.cantidad),
+                    "origen": payload.almacen_origen_id,
+                    "destino": payload.almacen_destino_id,
+                },
+            )
 
         return TransferenciaInventarioResponse(
             id=transferencia.id,

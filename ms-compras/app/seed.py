@@ -7,6 +7,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.core.database import async_session
+from app.enums.estado import EstadoOrdenCompra, EstadoRecepcionCompra
 from app.models import (
     OrdenCompra,
     OrdenCompraDetalle,
@@ -18,9 +19,9 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 PROVEEDORES = [
-    {"codigo": "PROV-001", "nombre": "Distribuidora Norte SA", "rfc": "DNO900101ABC", "email": "ventas@norte.com"},
-    {"codigo": "PROV-002", "nombre": "Suministros del Centro", "rfc": "SCO880202XYZ", "email": "contacto@centro.com"},
-    {"codigo": "PROV-003", "nombre": "Importadora Global", "rfc": "IGL770303GHI", "email": "info@global.com"},
+    {"codigo": "PROV-001", "nombre": "Distribuidora Bolivia S.R.L.", "email": "ventas@bolivia.com"},
+    {"codigo": "PROV-002", "nombre": "Importadora Andina S.A.", "email": "contacto@andina.com"},
+    {"codigo": "PROV-003", "nombre": "Proveedor Local Cochabamba", "email": "info@cochabamba.com"},
 ]
 
 
@@ -34,7 +35,7 @@ async def run_seed() -> None:
                 prov = Proveedor(**data)
                 db.add(prov)
                 await db.flush()
-                logger.info("Proveedor creado: %s", data["codigo"])
+                logger.info("Proveedor creado: %s", data["nombre"])
             proveedores[data["codigo"]] = prov
 
         await db.commit()
@@ -45,10 +46,10 @@ async def run_seed() -> None:
             orden1 = OrdenCompra(
                 codigo="OC-00001",
                 proveedor_id=p1.id,
-                estado="APROBADA",
+                estado=EstadoOrdenCompra.APROBADA.value,
                 fecha="2026-06-01",
-                total=Decimal("1500.00"),
-                observaciones="Orden demo 1",
+                total=Decimal("925.00"),
+                observaciones="Orden demo producto 1",
             )
             db.add(orden1)
             await db.flush()
@@ -56,18 +57,9 @@ async def run_seed() -> None:
                 OrdenCompraDetalle(
                     orden_id=orden1.id,
                     producto_id=1,
-                    cantidad=Decimal("10"),
-                    precio_unitario=Decimal("100.00"),
-                    subtotal=Decimal("1000.00"),
-                )
-            )
-            db.add(
-                OrdenCompraDetalle(
-                    orden_id=orden1.id,
-                    producto_id=2,
-                    cantidad=Decimal("5"),
-                    precio_unitario=Decimal("100.00"),
-                    subtotal=Decimal("500.00"),
+                    cantidad=Decimal("50"),
+                    precio_unitario=Decimal("18.50"),
+                    subtotal=Decimal("925.00"),
                 )
             )
 
@@ -75,20 +67,20 @@ async def run_seed() -> None:
             orden2 = OrdenCompra(
                 codigo="OC-00002",
                 proveedor_id=p2.id,
-                estado="PENDIENTE",
+                estado=EstadoOrdenCompra.BORRADOR.value,
                 fecha="2026-06-05",
-                total=Decimal("800.00"),
-                observaciones="Orden demo 2",
+                total=Decimal("360.00"),
+                observaciones="Orden demo producto 2",
             )
             db.add(orden2)
             await db.flush()
             db.add(
                 OrdenCompraDetalle(
                     orden_id=orden2.id,
-                    producto_id=3,
-                    cantidad=Decimal("8"),
-                    precio_unitario=Decimal("100.00"),
-                    subtotal=Decimal("800.00"),
+                    producto_id=2,
+                    cantidad=Decimal("30"),
+                    precio_unitario=Decimal("12.00"),
+                    subtotal=Decimal("360.00"),
                 )
             )
             await db.commit()
@@ -102,27 +94,24 @@ async def run_seed() -> None:
                 codigo="REC-00001",
                 orden_id=orden.id,
                 almacen_id=1,
-                estado="RECIBIDA",
+                estado=EstadoRecepcionCompra.BORRADOR.value,
                 fecha="2026-06-10",
-                observaciones="Recepción parcial demo",
+                total=Decimal("925.00"),
+                observaciones="Recepción demo orden 1",
             )
             db.add(rec1)
             await db.flush()
-            db.add(RecepcionCompraDetalle(recepcion_id=rec1.id, producto_id=1, cantidad=Decimal("10")))
-
-            rec2 = RecepcionCompra(
-                codigo="REC-00002",
-                orden_id=orden.id,
-                almacen_id=1,
-                estado="RECIBIDA",
-                fecha="2026-06-11",
-                observaciones="Recepción complemento demo",
+            db.add(
+                RecepcionCompraDetalle(
+                    recepcion_id=rec1.id,
+                    producto_id=1,
+                    cantidad_recibida=Decimal("50"),
+                    costo_unitario=Decimal("18.50"),
+                    subtotal=Decimal("925.00"),
+                )
             )
-            db.add(rec2)
-            await db.flush()
-            db.add(RecepcionCompraDetalle(recepcion_id=rec2.id, producto_id=2, cantidad=Decimal("5")))
             await db.commit()
-            logger.info("Recepciones demo creadas")
+            logger.info("Recepción demo creada")
 
     logger.info("Seed ms-compras completado")
 
