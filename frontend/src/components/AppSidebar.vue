@@ -58,7 +58,6 @@ const menuItems: MenuItem[] = [
       { title: 'Categorías', icon: 'mdi-shape-outline', to: '/catalogos/categorias' },
       { title: 'Marcas', icon: 'mdi-tag-outline', to: '/catalogos/marcas' },
       { title: 'Unidades de medida', icon: 'mdi-ruler', to: '/catalogos/unidades-medida' },
-      { title: 'Productos', icon: 'mdi-package-variant-closed', to: '/catalogos/productos' },
     ],
   },
   {
