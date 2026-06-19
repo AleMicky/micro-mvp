@@ -42,6 +42,7 @@ const menuItems: MenuItem[] = [
       { title: 'Notificaciones', icon: 'mdi-bell-ring-outline', to: '/notificaciones' },
     ],
   },
+  { title: 'Chatbot', icon: 'mdi-robot-outline', to: '/chatbot' },
   {
     title: 'Seguridad',
     icon: 'mdi-shield-account-outline',

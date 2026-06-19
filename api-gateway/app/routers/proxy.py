@@ -198,3 +198,20 @@ async def proxy_notificaciones_root(request: Request) -> Response:
 async def proxy_notificaciones(path: str, request: Request) -> Response:
     target_url = f"{settings.ms_notificaciones_url}/notificaciones/{path}"
     return await _proxy_request(target_url, request)
+
+
+@router.api_route(
+    "/chatbot",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_chatbot_root(request: Request) -> Response:
+    return await _proxy_request(f"{settings.ms_chatbot_url}/chatbot", request)
+
+
+@router.api_route(
+    "/chatbot/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def proxy_chatbot(path: str, request: Request) -> Response:
+    target_url = f"{settings.ms_chatbot_url}/chatbot/{path}"
+    return await _proxy_request(target_url, request)

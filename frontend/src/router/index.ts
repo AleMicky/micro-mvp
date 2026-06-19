@@ -55,6 +55,11 @@ const router = createRouter({
           component: () => import('@/views/notificaciones/NotificacionesView.vue'),
         },
         {
+          path: 'chatbot',
+          name: 'chatbot',
+          component: () => import('@/views/chatbot/ChatbotView.vue'),
+        },
+        {
           path: 'catalogos/categorias',
           name: 'categorias',
           component: () => import('@/views/catalogos/CategoriasView.vue'),

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     ms_company_url: str = "http://localhost:8008"
     ms_clientes_url: str = "http://localhost:8009"
     ms_notificaciones_url: str = "http://localhost:8010"
+    ms_chatbot_url: str = "http://localhost:8011"
     cors_origins: str = "http://localhost:3000"
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"

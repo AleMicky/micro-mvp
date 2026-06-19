@@ -20,6 +20,7 @@ const segmentLabels: Record<string, string> = {
   historial: 'Historial',
   puntos: 'Puntos',
   notificaciones: 'Notificaciones',
+  chatbot: 'Chatbot',
   seguridad: 'Seguridad',
   usuarios: 'Usuarios',
   roles: 'Roles',

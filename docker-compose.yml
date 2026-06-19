@@ -191,6 +191,25 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-chatbot:
+    image: postgres:16-alpine
+    container_name: postgres-chatbot
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_CHATBOT_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_CHATBOT_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_CHATBOT_DB}
+    ports:
+      - "${POSTGRES_CHATBOT_PORT}:5432"
+    volumes:
+      - postgres_chatbot_data:/var/lib/postgresql/data
+      - ./ms-chatbot/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_CHATBOT_USER} -d ${POSTGRES_CHATBOT_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     container_name: rabbitmq
@@ -496,6 +515,43 @@ services:
       retries: 3
       start_period: 25s
 
+  ms-chatbot:
+    build:
+      context: ./ms-chatbot
+      dockerfile: Dockerfile
+    container_name: ms-chatbot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_CHATBOT_USER}:${POSTGRES_CHATBOT_PASSWORD}@postgres-chatbot:5432/${POSTGRES_CHATBOT_DB}
+      SERVICE_NAME: ms-chatbot
+      MS_CATALOGOS_URL: http://ms-catalogos:8001
+      MS_INVENTARIO_URL: http://ms-inventario:8002
+      MS_COMPANY_URL: http://ms-company:8008
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET}
+      WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION}
+    ports:
+      - "${MS_CHATBOT_PORT}:8011"
+    depends_on:
+      postgres-chatbot:
+        condition: service_healthy
+      ms-catalogos:
+        condition: service_healthy
+      ms-inventario:
+        condition: service_healthy
+      ms-company:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8011/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -515,6 +571,7 @@ services:
       MS_COMPANY_URL: http://ms-company:8008
       MS_CLIENTES_URL: http://ms-clientes:8009
       MS_NOTIFICACIONES_URL: http://ms-notificaciones:8010
+      MS_CHATBOT_URL: http://ms-chatbot:8011
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
     ports:
@@ -539,6 +596,8 @@ services:
       ms-clientes:
         condition: service_healthy
       ms-notificaciones:
+        condition: service_healthy
+      ms-chatbot:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -570,3 +629,4 @@ volumes:
   postgres_company_data:
   postgres_clientes_data:
   postgres_notificaciones_data:
+  postgres_chatbot_data:
