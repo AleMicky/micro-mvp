@@ -18,5 +18,8 @@ class Settings(BaseSettings):
     whatsapp_app_secret: str = ""
     whatsapp_api_version: str = "v20.0"
 
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+
 
 settings = Settings()

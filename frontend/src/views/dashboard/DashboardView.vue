@@ -87,12 +87,13 @@ onMounted(loadDashboard)
 </script>
 
 <template>
-  <div>
+  <div class="dashboard-page">
     <PageHeader title="Dashboard" subtitle="Resumen general del sistema" icon="mdi-view-dashboard-outline" />
 
-    <v-row>
-      <v-col v-for="stat in stats" :key="stat.title" cols="12" sm="6" lg="3">
-        <v-card class="stat-card pa-5" :loading="loading">
+    <v-container fluid class="px-0">
+      <v-row class="mx-0">
+        <v-col v-for="stat in stats" :key="stat.title" cols="12" sm="6" lg="3" class="px-2">
+          <v-card class="stat-card pa-4" :loading="loading">
           <div class="d-flex justify-space-between align-start">
             <div>
               <div class="text-caption text-medium-emphasis mb-1">{{ stat.title }}</div>
@@ -105,20 +106,35 @@ onMounted(loadDashboard)
           </div>
         </v-card>
       </v-col>
-    </v-row>
+      </v-row>
 
-    <v-card class="mt-6" border elevation="0">
-      <v-card-title class="pa-5 pb-2">
+      <v-card class="mt-6 mx-0" border elevation="0">
+        <v-card-title class="pa-4 pb-2">
         <div class="text-h6 font-weight-bold">Movimientos recientes</div>
       </v-card-title>
-      <v-card-text class="pa-5 pt-0">
+        <v-card-text class="pa-4 pt-0">
         <v-data-table :headers="movimientoHeaders" :items="movimientosRecientes" :loading="loading" item-value="id" hover :items-per-page="8" hide-default-footer>
           <template #item.tipo="{ value }">
             <v-chip :color="tipoColors[value] ?? 'default'" size="small" variant="tonal">{{ value }}</v-chip>
           </template>
           <template #item.creado_en="{ value }">{{ new Date(value).toLocaleString('es-MX') }}</template>
         </v-data-table>
-      </v-card-text>
-    </v-card>
+        </v-card-text>
+      </v-card>
+    </v-container>
   </div>
 </template>
+
+<style scoped>
+.dashboard-page {
+  width: calc(100% + 40px);
+  margin: 0 -20px;
+}
+
+@media (min-width: 960px) {
+  .dashboard-page {
+    width: calc(100% + 80px);
+    margin: 0 -40px;
+  }
+}
+</style>
