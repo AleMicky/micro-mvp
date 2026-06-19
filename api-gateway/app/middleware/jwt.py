@@ -14,6 +14,10 @@ PUBLIC_ROUTES = {
     ("POST", "/auth/register"),
 }
 
+PUBLIC_PREFIXES = (
+    "/static",
+)
+
 PROTECTED_PREFIXES = (
     "/catalogos",
     "/inventario",
@@ -39,6 +43,8 @@ def _requires_auth(method: str, path: str) -> bool:
     if method == "OPTIONS":
         return False
     if (method, path) in PUBLIC_ROUTES:
+        return False
+    if any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
         return False
     if any(path.startswith(prefix) for prefix in PROTECTED_PREFIXES):
         return True

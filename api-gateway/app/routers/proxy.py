@@ -61,6 +61,15 @@ async def _proxy_request(target_url: str, request: Request) -> Response:
 
 
 @router.api_route(
+    "/static/{path:path}",
+    methods=["GET"],
+)
+async def proxy_static(path: str, request: Request) -> Response:
+    target_url = f"{settings.ms_catalogos_url}/static/{path}"
+    return await _proxy_request(target_url, request)
+
+
+@router.api_route(
     "/catalogos/{path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
 )

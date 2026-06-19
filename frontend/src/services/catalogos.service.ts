@@ -6,6 +6,8 @@ import type {
   Marca,
   MarcaCreate,
   MarcaUpdate,
+  PrecioProducto,
+  PrecioProductoCreate,
   Producto,
   ProductoCreate,
   ProductoUpdate,
@@ -65,5 +67,25 @@ export const catalogosService = {
   },
   deleteProducto(id: number) {
     return api.delete(`/catalogos/productos/${id}`)
+  },
+
+  uploadProductoImagen(id: number, file: File) {
+    const formData = new FormData()
+    formData.append('imagen', file)
+    return api.post<{ imagen_url: string }>(`/catalogos/productos/${id}/imagen`, formData, {
+      headers: { 'Content-Type': undefined as never },
+    })
+  },
+  deleteProductoImagen(id: number) {
+    return api.delete<{ imagen_url: string }>(`/catalogos/productos/${id}/imagen`)
+  },
+  crearPrecioProducto(id: number, data: PrecioProductoCreate) {
+    return api.post<PrecioProducto>(`/catalogos/productos/${id}/precios`, data)
+  },
+  obtenerPreciosProducto(id: number) {
+    return api.get<PrecioProducto[]>(`/catalogos/productos/${id}/precios`)
+  },
+  obtenerPrecioActualProducto(id: number) {
+    return api.get<PrecioProducto>(`/catalogos/productos/${id}/precio-actual`)
   },
 }

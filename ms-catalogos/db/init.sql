@@ -85,6 +85,7 @@ CREATE TABLE productos (
     marca_id            INTEGER,
     unidad_medida_id    INTEGER         NOT NULL,
     precio_base         NUMERIC(15, 2)  NOT NULL DEFAULT 0,
+    imagen_url          VARCHAR(500),
     estado              VARCHAR(30)     NOT NULL DEFAULT 'ACTIVO',
     activo              BOOLEAN         NOT NULL DEFAULT TRUE,
     creado_en           TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
@@ -108,3 +109,21 @@ CREATE INDEX idx_productos_nombre ON productos (nombre);
 CREATE TRIGGER trg_productos_actualizado
     BEFORE UPDATE ON productos
     FOR EACH ROW EXECUTE FUNCTION actualizar_timestamp();
+
+-- ── 5. precios_producto ─────────────────────────────────────
+CREATE TABLE precios_producto (
+    id              SERIAL          PRIMARY KEY,
+    producto_id     INTEGER         NOT NULL,
+    precio_venta    NUMERIC(15, 2)  NOT NULL,
+    fecha_inicio    TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    fecha_fin       TIMESTAMPTZ,
+    activo          BOOLEAN         NOT NULL DEFAULT TRUE,
+    creado_en       TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    actualizado_en  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_precios_producto_producto
+        FOREIGN KEY (producto_id) REFERENCES productos (id)
+);
+
+CREATE INDEX idx_precios_producto_producto_id ON precios_producto (producto_id);
+CREATE INDEX idx_precios_producto_activo ON precios_producto (producto_id, activo) WHERE activo = TRUE;

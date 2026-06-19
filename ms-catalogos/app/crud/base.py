@@ -32,7 +32,9 @@ class CRUDBase(Generic[ModelT, CreateT, UpdateT]):
         return list(result.scalars().all())
 
     async def create(self, db: AsyncSession, obj_in: CreateT) -> ModelT:
-        obj = self.model(**obj_in.model_dump())
+        data = obj_in.model_dump()
+        data.pop("precio_venta", None)
+        obj = self.model(**data)
         db.add(obj)
         await db.commit()
         await db.refresh(obj)

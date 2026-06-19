@@ -21,8 +21,10 @@ class Producto(Base, AuditoriaMixin):
         ForeignKey("unidades_medida.id"), nullable=False
     )
     precio_base: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False, default=0)
+    imagen_url: Mapped[str | None] = mapped_column(String(500))
     estado: Mapped[str] = mapped_column(String(30), nullable=False, default="ACTIVO")
 
     categoria: Mapped["Categoria"] = relationship(back_populates="productos")
     marca: Mapped["Marca | None"] = relationship(back_populates="productos")
     unidad_medida: Mapped["UnidadMedida"] = relationship(back_populates="productos")
+    precios: Mapped[list["PrecioProducto"]] = relationship(back_populates="producto")
