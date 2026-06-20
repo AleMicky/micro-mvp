@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import BaseDataTable from '@/components/BaseDataTable.vue'
+import MovimientosInventarioTable from '@/components/MovimientosInventarioTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useMovimientosInventario } from '@/composables/useMovimientosInventario'
 import { catalogosService } from '@/services/catalogos.service'
 import { inventarioService } from '@/services/inventario.service'
 import { getErrorMessage } from '@/services/api'
@@ -9,7 +10,7 @@ import { useAppStore } from '@/stores/app.store'
 import { formatInteger } from '@/utils/format'
 import { nonNegativeRule, requiredRule } from '@/utils/validation'
 import type { Producto } from '@/types/catalogos.types'
-import type { Almacen, MovimientoInventario, TipoMovimiento } from '@/types/inventario.types'
+import type { Almacen } from '@/types/inventario.types'
 
 interface DetalleRow {
   key: number
@@ -21,11 +22,9 @@ const appStore = useAppStore()
 
 const productos = ref<Producto[]>([])
 const almacenes = ref<Almacen[]>([])
-const movimientos = ref<MovimientoInventario[]>([])
 const existenciasMap = ref<Record<number, number>>({})
 const catalogosReady = ref(false)
 const loadingExistencias = ref(false)
-const loadingMovimientos = ref(false)
 const saving = ref(false)
 const search = ref('')
 const nextRowKey = ref(1)
@@ -41,6 +40,15 @@ const form = reactive({
   observaciones: '',
 })
 
+const { loading: loadingMovimientos, filteredRows, refresh: refreshMovimientos } =
+  useMovimientosInventario()
+
+const almacenFilter = computed(() => form.almacen_id)
+const ajustesVisibles = filteredRows({
+  almacenId: almacenFilter,
+  tipos: ['AJUSTE_POSITIVO', 'AJUSTE_NEGATIVO'],
+})
+
 const detalles = ref<DetalleRow[]>([{ key: 0, producto_id: null, cantidad_nueva: null }])
 
 const productoMap = computed(() => Object.fromEntries(productos.value.map((p) => [p.id, p.nombre])))
@@ -52,24 +60,6 @@ const almacenNombre = computed(
 const validLineCount = computed(
   () => detalles.value.filter((d) => hasCambio(d)).length,
 )
-
-const ajustesFiltrados = computed(() => {
-  const tipos: TipoMovimiento[] = ['AJUSTE_POSITIVO', 'AJUSTE_NEGATIVO']
-  return movimientos.value.filter((m) => {
-    if (!tipos.includes(m.tipo)) return false
-    if (form.almacen_id && m.almacen_id !== form.almacen_id) return false
-    return true
-  })
-})
-
-const headers = [
-  { title: 'Tipo', key: 'tipo', width: 100 },
-  { title: 'Producto', key: 'producto_id' },
-  { title: 'Cant.', key: 'cantidad', align: 'end' as const, width: 64 },
-  { title: 'Stock', key: 'stock', align: 'center' as const, width: 96, sortable: false },
-  { title: 'Obs.', key: 'observaciones', width: 120 },
-  { title: 'Fecha', key: 'creado_en', width: 130 },
-]
 
 function stockActualOrZero(productoId: number | null): number {
   if (!productoId || !form.almacen_id) return 0
@@ -178,18 +168,6 @@ async function loadExistencias(almacenId: number) {
   }
 }
 
-async function loadMovimientos() {
-  loadingMovimientos.value = true
-  try {
-    const { data } = await inventarioService.getMovimientos()
-    movimientos.value = data
-  } catch (error) {
-    appStore.showError(getErrorMessage(error))
-  } finally {
-    loadingMovimientos.value = false
-  }
-}
-
 async function submitForm() {
   const validation = await formRef.value?.validate()
   if (!validation?.valid) return
@@ -224,21 +202,15 @@ async function submitForm() {
     form.observaciones = ''
     resetDetalles()
     formRef.value?.resetValidation()
-    await Promise.all([loadMovimientos(), form.almacen_id ? loadExistencias(form.almacen_id) : Promise.resolve()])
+    await Promise.all([
+      refreshMovimientos(),
+      form.almacen_id ? loadExistencias(form.almacen_id) : Promise.resolve(),
+    ])
   } catch (error) {
     appStore.showError(getErrorMessage(error))
   } finally {
     saving.value = false
   }
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleString('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 watch(
@@ -253,7 +225,7 @@ watch(
 )
 
 onMounted(async () => {
-  await Promise.all([loadCatalogos(), loadMovimientos()])
+  await Promise.all([loadCatalogos(), refreshMovimientos()])
 })
 </script>
 
@@ -432,66 +404,15 @@ onMounted(async () => {
       </v-card>
 
       <div class="historial-section">
-        <BaseDataTable
+        <MovimientosInventarioTable
           v-model:search="search"
-          :items="ajustesFiltrados as Record<string, unknown>[]"
-          :headers="headers"
+          :items="ajustesVisibles"
           :loading="loadingMovimientos"
           :title="form.almacen_id ? `Ajustes — ${almacenNombre}` : 'Ajustes recientes'"
           subtitle="Historial de correcciones de inventario"
-          search-label="Buscar..."
-          empty-subtitle="Los ajustes registrados aparecerán aquí."
-        >
-          <template #actions>
-            <v-btn
-              icon="mdi-refresh"
-              variant="text"
-              size="small"
-              :loading="loadingMovimientos"
-              aria-label="Actualizar historial"
-              @click="loadMovimientos"
-            />
-          </template>
-
-          <template #item.tipo="{ value }">
-            <v-chip
-              :color="value === 'AJUSTE_POSITIVO' ? 'success' : 'warning'"
-              size="x-small"
-              variant="tonal"
-              label
-            >
-              {{ value === 'AJUSTE_POSITIVO' ? 'Ajuste +' : 'Ajuste −' }}
-            </v-chip>
-          </template>
-
-          <template #item.producto_id="{ value }">
-            <span class="cell-ellipsis" :title="productoMap[value] ?? String(value)">
-              {{ productoMap[value] ?? value }}
-            </span>
-          </template>
-
-          <template #item.cantidad="{ value }">
-            <span class="font-weight-medium">{{ formatInteger(value) }}</span>
-          </template>
-
-          <template #item.stock="{ item }">
-            <span class="stock-delta text-caption">
-              {{ formatInteger(item.cantidad_anterior) }}
-              <v-icon icon="mdi-arrow-right-thin" size="12" />
-              <strong>{{ formatInteger(item.cantidad_nueva) }}</strong>
-            </span>
-          </template>
-
-          <template #item.observaciones="{ value }">
-            <span class="cell-ellipsis text-medium-emphasis" :title="value ?? ''">
-              {{ value || '—' }}
-            </span>
-          </template>
-
-          <template #item.creado_en="{ value }">
-            <span class="text-caption text-medium-emphasis">{{ formatDate(value) }}</span>
-          </template>
-        </BaseDataTable>
+          :show-almacen="!form.almacen_id"
+          @refresh="refreshMovimientos"
+        />
       </div>
     </div>
   </div>

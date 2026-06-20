@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import BaseDataTable from '@/components/BaseDataTable.vue'
+import MovimientosInventarioTable from '@/components/MovimientosInventarioTable.vue'
+import { useMovimientosInventario } from '@/composables/useMovimientosInventario'
 import { catalogosService } from '@/services/catalogos.service'
 import { inventarioService } from '@/services/inventario.service'
 import { getErrorMessage } from '@/services/api'
@@ -10,30 +13,88 @@ import { formatInteger } from '@/utils/format'
 import type { Producto } from '@/types/catalogos.types'
 import type { Almacen, Existencia } from '@/types/inventario.types'
 
-const appStore = useAppStore()
+interface ExistenciaRow extends Existencia {
+  producto_nombre: string
+  producto_codigo: string
+  almacen_nombre: string
+}
 
-const items = ref<Existencia[]>([])
+const appStore = useAppStore()
+const route = useRoute()
+
+const rawItems = ref<Existencia[]>([])
 const productos = ref<Producto[]>([])
 const almacenes = ref<Almacen[]>([])
 const loading = ref(false)
 const search = ref('')
 const filterProducto = ref<number | null>(null)
 const filterAlmacen = ref<number | null>(null)
+const movimientosSearch = ref('')
 
-const productoMap = computed(() => Object.fromEntries(productos.value.map((p) => [p.id, p.nombre])))
+const {
+  loading: loadingMovimientos,
+  filteredRows,
+  refresh: refreshMovimientos,
+} = useMovimientosInventario()
+
+const movimientosVisibles = filteredRows({
+  productoId: filterProducto,
+  almacenId: filterAlmacen,
+})
+
+const productoMap = computed(() => Object.fromEntries(productos.value.map((p) => [p.id, p])))
 const almacenMap = computed(() => Object.fromEntries(almacenes.value.map((a) => [a.id, a.nombre])))
 
+const filteredItems = computed(() => {
+  let result = rawItems.value
+  if (filterProducto.value != null) {
+    result = result.filter((e) => e.producto_id === filterProducto.value)
+  }
+  if (filterAlmacen.value != null) {
+    result = result.filter((e) => e.almacen_id === filterAlmacen.value)
+  }
+  return result
+})
+
+const tableItems = computed<ExistenciaRow[]>(() =>
+  filteredItems.value.map((e) => {
+    const producto = productoMap.value[e.producto_id]
+    return {
+      ...e,
+      producto_nombre: producto?.nombre ?? `Producto ${e.producto_id}`,
+      producto_codigo: producto?.codigo ?? '',
+      almacen_nombre: almacenMap.value[e.almacen_id] ?? `Almacén ${e.almacen_id}`,
+    }
+  }),
+)
+
 const stats = computed(() => {
-  const bajo = items.value.filter((item) => getStockStatus(item) === 'bajo').length
-  const total = items.value.reduce((sum, item) => sum + Number(item.cantidad_actual), 0)
-  return { filas: items.value.length, bajo, total: Math.trunc(total) }
+  const bajo = tableItems.value.filter((item) => getStockStatus(item) === 'bajo').length
+  const total = tableItems.value.reduce((sum, item) => sum + Number(item.cantidad_actual), 0)
+  return { filas: tableItems.value.length, bajo, total: Math.trunc(total) }
 })
 
 const hasFilters = computed(() => filterProducto.value !== null || filterAlmacen.value !== null)
 
+const filterHint = computed(() => {
+  if (filterProducto.value && filterAlmacen.value) {
+    const prod = productoMap.value[filterProducto.value]?.nombre
+    const alm = almacenMap.value[filterAlmacen.value]
+    return `Mostrando stock de ${prod ?? 'producto'} en ${alm ?? 'almacén'}.`
+  }
+  if (filterAlmacen.value) {
+    return `Mostrando existencias del almacén ${almacenMap.value[filterAlmacen.value] ?? filterAlmacen.value}.`
+  }
+  if (filterProducto.value) {
+    return `Mostrando existencias de ${productoMap.value[filterProducto.value]?.nombre ?? filterProducto.value} en todos los almacenes.`
+  }
+  return 'Stock actual por producto y almacén. Use los filtros o la búsqueda por nombre.'
+})
+
 const headers = [
-  { title: 'Producto', key: 'producto_id' },
-  { title: 'Almacén', key: 'almacen_id' },
+  { title: 'Producto', key: 'producto_nombre' },
+  { title: 'Código', key: 'producto_codigo', width: 100 },
+  { title: 'Almacén', key: 'almacen_nombre' },
   { title: 'Cant.', key: 'cantidad_actual', align: 'end' as const, width: 72 },
   { title: 'Mín.', key: 'stock_minimo', align: 'end' as const, width: 64 },
   { title: 'Máx.', key: 'stock_maximo', align: 'end' as const, width: 64 },
@@ -53,6 +114,19 @@ function stockLevel(item: Existencia): number {
   return Math.min(100, Math.round((Number(item.cantidad_actual) / max) * 100))
 }
 
+function parseQueryId(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const num = Number(value)
+  return Number.isInteger(num) && num > 0 ? num : null
+}
+
+function applyRouteFilters() {
+  const almacen = parseQueryId(route.query.almacen)
+  const producto = parseQueryId(route.query.producto)
+  if (almacen != null) filterAlmacen.value = almacen
+  if (producto != null) filterProducto.value = producto
+}
+
 function clearFilters() {
   filterProducto.value = null
   filterAlmacen.value = null
@@ -64,22 +138,14 @@ async function loadCatalogos() {
     inventarioService.getAlmacenes(),
   ])
   productos.value = productosRes.data
-  almacenes.value = almacenesRes.data
+  almacenes.value = almacenesRes.data.filter((a) => a.activo)
 }
 
 async function loadExistencias() {
   loading.value = true
   try {
-    if (filterProducto.value) {
-      const { data } = await inventarioService.getExistenciasByProducto(filterProducto.value)
-      items.value = data
-    } else if (filterAlmacen.value) {
-      const { data } = await inventarioService.getExistenciasByAlmacen(filterAlmacen.value)
-      items.value = data
-    } else {
-      const { data } = await inventarioService.getExistencias()
-      items.value = data
-    }
+    const { data } = await inventarioService.getExistencias({ limit: 500 })
+    rawItems.value = data
   } catch (error) {
     appStore.showError(getErrorMessage(error))
   } finally {
@@ -87,12 +153,21 @@ async function loadExistencias() {
   }
 }
 
-watch([filterProducto, filterAlmacen], loadExistencias)
+async function refresh() {
+  await Promise.all([loadExistencias(), refreshMovimientos()])
+}
+
+watch(
+  () => route.query,
+  () => applyRouteFilters(),
+  { deep: true },
+)
 
 onMounted(async () => {
   try {
+    applyRouteFilters()
     await loadCatalogos()
-    await loadExistencias()
+    await Promise.all([loadExistencias(), refreshMovimientos()])
   } catch (error) {
     appStore.showError(getErrorMessage(error))
   }
@@ -111,8 +186,8 @@ onMounted(async () => {
           variant="tonal"
           size="small"
           prepend-icon="mdi-refresh"
-          :loading="loading"
-          @click="loadExistencias"
+          :loading="loading || loadingMovimientos"
+          @click="refresh"
         >
           Actualizar
         </v-btn>
@@ -147,8 +222,13 @@ onMounted(async () => {
           density="compact"
           prepend-inner-icon="mdi-package-variant"
           class="filters-bar__field filters-bar__field--producto"
-          @update:model-value="filterAlmacen = null"
-        />
+        >
+          <template #item="{ props: itemProps, item }">
+            <v-list-item v-bind="itemProps">
+              <template #subtitle>{{ item.raw.codigo }}</template>
+            </v-list-item>
+          </template>
+        </v-autocomplete>
         <v-autocomplete
           v-model="filterAlmacen"
           :items="almacenes"
@@ -160,7 +240,6 @@ onMounted(async () => {
           density="compact"
           prepend-inner-icon="mdi-warehouse"
           class="filters-bar__field filters-bar__field--almacen"
-          @update:model-value="filterProducto = null"
         />
         <v-btn
           v-if="hasFilters"
@@ -173,27 +252,35 @@ onMounted(async () => {
           Limpiar
         </v-btn>
       </div>
+      <p class="filters-hint">
+        <v-icon icon="mdi-information-outline" size="14" class="mr-1" />
+        {{ filterHint }}
+      </p>
     </div>
 
     <BaseDataTable
       v-model:search="search"
-      :items="items as Record<string, unknown>[]"
+      :items="tableItems as unknown as Record<string, unknown>[]"
       :headers="headers"
       :loading="loading"
       title="Inventario"
       subtitle="Existencias actuales"
-      search-label="Buscar producto o almacén..."
-      empty-subtitle="Registra ingresos de stock para ver existencias."
+      search-label="Buscar producto, código o almacén..."
+      empty-subtitle="Confirme una recepción de compra o registre un ingreso manual para ver existencias."
     >
-      <template #item.producto_id="{ value }">
-        <span class="cell-ellipsis cell-ellipsis--wide" :title="productoMap[value] ?? String(value)">
-          {{ productoMap[value] ?? value }}
+      <template #item.producto_nombre="{ value }">
+        <span class="cell-ellipsis cell-ellipsis--wide" :title="value ?? ''">
+          {{ value }}
         </span>
       </template>
 
-      <template #item.almacen_id="{ value }">
-        <span class="cell-ellipsis" :title="almacenMap[value] ?? String(value)">
-          {{ almacenMap[value] ?? value }}
+      <template #item.producto_codigo="{ value }">
+        <span class="code-badge">{{ value || '—' }}</span>
+      </template>
+
+      <template #item.almacen_nombre="{ value }">
+        <span class="cell-ellipsis" :title="value ?? ''">
+          {{ value }}
         </span>
       </template>
 
@@ -234,6 +321,19 @@ onMounted(async () => {
         </v-chip>
       </template>
     </BaseDataTable>
+
+    <MovimientosInventarioTable
+      v-model:search="movimientosSearch"
+      :items="movimientosVisibles"
+      :loading="loadingMovimientos"
+      title="Movimientos de inventario"
+      :subtitle="
+        hasFilters
+          ? 'Movimientos que afectaron el stock filtrado'
+          : 'Todos los movimientos: recepciones, ingresos, salidas, ajustes y transferencias'
+      "
+      @refresh="refreshMovimientos"
+    />
   </div>
 </template>
 
@@ -296,6 +396,14 @@ onMounted(async () => {
   gap: 10px;
 }
 
+.filters-hint {
+  margin: 8px 0 0;
+  font-size: var(--mac-text-xs);
+  color: rgba(var(--v-theme-on-surface), 0.55);
+  display: flex;
+  align-items: center;
+}
+
 .filters-bar__field--producto {
   flex: 1 1 280px;
   min-width: 240px;
@@ -317,6 +425,17 @@ onMounted(async () => {
   overflow: visible;
   text-overflow: clip;
   white-space: nowrap;
+}
+
+.code-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: var(--mac-text-xs);
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(var(--v-theme-on-surface), 0.06);
+  color: rgba(var(--v-theme-on-surface), 0.8);
 }
 
 .cell-ellipsis {

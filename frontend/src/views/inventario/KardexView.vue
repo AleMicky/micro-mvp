@@ -7,6 +7,7 @@ import { inventarioService } from '@/services/inventario.service'
 import { getErrorMessage } from '@/services/api'
 import { useAppStore } from '@/stores/app.store'
 import { formatDateCompact, formatInteger, formatMoney } from '@/utils/format'
+import { enrichMovimiento } from '@/utils/inventario-movimientos'
 import type { Producto } from '@/types/catalogos.types'
 import type { Existencia, MovimientoInventario, TipoMovimiento } from '@/types/inventario.types'
 
@@ -25,6 +26,9 @@ const productoSeleccionado = computed(() =>
   productos.value.find((p) => p.id === selectedProducto.value) ?? null,
 )
 
+const productoMap = computed(() =>
+  Object.fromEntries(productos.value.map((p) => [p.id, { nombre: p.nombre, codigo: p.codigo }])),
+)
 const almacenMap = computed(() => Object.fromEntries(almacenes.value.map((a) => [a.id, a.nombre])))
 
 const stockTotal = computed(() =>
@@ -49,11 +53,16 @@ const resumenPrecios = computed(() => {
 
 const movimientosVisibles = computed(() => {
   const term = search.value.trim().toLowerCase()
-  if (!term) return movimientos.value
-  return movimientos.value.filter((m) => {
+  const base = movimientos.value.map((m) =>
+    enrichMovimiento(m, productoMap.value, almacenMap.value),
+  )
+  if (!term) return base
+  return base.filter((m) => {
     const texto = [
       m.tipo,
+      m.producto_nombre,
       almacenMap.value[m.almacen_id],
+      m.referencia_label,
       m.observaciones,
       formatInteger(m.cantidad),
     ]
@@ -104,7 +113,7 @@ const headers = [
   { title: 'Stock', key: 'stock', align: 'center' as const, width: 96, sortable: false },
   { title: 'Costo', key: 'valor_costo', align: 'end' as const, width: 88, sortable: false },
   { title: 'Precio', key: 'valor_venta', align: 'end' as const, width: 88, sortable: false },
-  { title: 'Obs.', key: 'observaciones', width: 120 },
+  { title: 'Origen / Ref.', key: 'referencia_label', width: 150 },
   { title: 'Fecha', key: 'creado_en', width: 130 },
 ]
 
@@ -255,7 +264,7 @@ onMounted(loadCatalogos)
     <div class="kardex-table-wrap">
     <BaseDataTable
       v-model:search="search"
-      :items="movimientos as Record<string, unknown>[]"
+      :items="movimientosVisibles as unknown as Record<string, unknown>[]"
       :headers="headers"
       :loading="loading"
       :show-search="!!selectedProducto"
@@ -308,7 +317,7 @@ onMounted(loadCatalogos)
         </span>
       </template>
 
-      <template #item.observaciones="{ value }">
+      <template #item.referencia_label="{ value }">
         <span class="cell-ellipsis text-medium-emphasis" :title="value ?? ''">
           {{ value || '—' }}
         </span>

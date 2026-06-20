@@ -355,6 +355,16 @@ onMounted(async () => {
           </template>
           <v-list density="compact" min-width="140">
             <v-list-item
+              prepend-icon="mdi-chart-timeline-variant"
+              title="Ver movimientos"
+              :to="{ name: 'stock-operaciones', query: { view: 'historial', almacen: item.id } }"
+            />
+            <v-list-item
+              prepend-icon="mdi-package-check"
+              title="Ver existencias"
+              :to="{ name: 'existencias', query: { almacen: item.id } }"
+            />
+            <v-list-item
               prepend-icon="mdi-pencil-outline"
               title="Editar"
               @click="openEdit(item as Almacen)"

@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import BaseDataTable from '@/components/BaseDataTable.vue'
+import MovimientosInventarioTable from '@/components/MovimientosInventarioTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useMovimientosInventario } from '@/composables/useMovimientosInventario'
 import { catalogosService } from '@/services/catalogos.service'
 import { inventarioService } from '@/services/inventario.service'
 import { getErrorMessage } from '@/services/api'
 import { useAppStore } from '@/stores/app.store'
 import { positiveNumberRule, requiredRule } from '@/utils/validation'
-import { formatInteger } from '@/utils/format'
 import type { Producto } from '@/types/catalogos.types'
-import type { Almacen, MovimientoInventario, TipoMovimiento } from '@/types/inventario.types'
+import type { Almacen } from '@/types/inventario.types'
 
 type OperacionTab = 'ingreso' | 'salida'
 
@@ -21,16 +21,24 @@ const appStore = useAppStore()
 const activeTab = ref<OperacionTab>('ingreso')
 const productos = ref<Producto[]>([])
 const almacenes = ref<Almacen[]>([])
-const movimientos = ref<MovimientoInventario[]>([])
 const catalogosReady = ref(false)
-const loadingMovimientos = ref(false)
 const saving = ref(false)
 const search = ref('')
+const filterProducto = ref<number | null>(null)
+const filterAlmacen = ref<number | null>(null)
 const formRef = ref<{
   validate: () => Promise<{ valid: boolean }>
   resetValidation: () => void
 } | null>(null)
 const historialRef = ref<HTMLElement | null>(null)
+
+const { loading: loadingMovimientos, filteredRows, refresh: refreshMovimientos } =
+  useMovimientosInventario()
+
+const movimientosVisibles = filteredRows({
+  productoId: filterProducto,
+  almacenId: filterAlmacen,
+})
 
 const form = reactive({
   producto_id: null as number | null,
@@ -43,6 +51,15 @@ const form = reactive({
 
 const productoMap = computed(() => Object.fromEntries(productos.value.map((p) => [p.id, p.nombre])))
 const almacenMap = computed(() => Object.fromEntries(almacenes.value.map((a) => [a.id, a.nombre])))
+
+const historialSubtitle = computed(() => {
+  if (filterProducto.value && filterAlmacen.value) {
+    return `Movimientos de ${productoMap.value[filterProducto.value]} en ${almacenMap.value[filterAlmacen.value]}`
+  }
+  if (filterAlmacen.value) return `Movimientos del almacén ${almacenMap.value[filterAlmacen.value]}`
+  if (filterProducto.value) return `Movimientos del producto ${productoMap.value[filterProducto.value]}`
+  return 'Todos los movimientos de inventario'
+})
 
 const tabMeta: Record<
   OperacionTab,
@@ -64,25 +81,6 @@ const tabMeta: Record<
     successMsg: 'Salida de stock registrada',
     hint: 'Salida de mercancía del almacén',
   },
-}
-
-const headers = [
-  { title: 'Tipo', key: 'tipo', width: 108 },
-  { title: 'Producto', key: 'producto_id' },
-  { title: 'Almacén', key: 'almacen_id' },
-  { title: 'Cant.', key: 'cantidad', align: 'end' as const, width: 72 },
-  { title: 'Stock', key: 'stock', align: 'center' as const, width: 100, sortable: false },
-  { title: 'Obs.', key: 'observaciones', width: 120 },
-  { title: 'Fecha', key: 'creado_en', width: 130 },
-]
-
-const tipoConfig: Record<TipoMovimiento, { color: string; label: string }> = {
-  INGRESO: { color: 'success', label: 'Ingreso' },
-  SALIDA: { color: 'error', label: 'Salida' },
-  AJUSTE_POSITIVO: { color: 'info', label: 'Ajuste +' },
-  AJUSTE_NEGATIVO: { color: 'warning', label: 'Ajuste −' },
-  TRANSFERENCIA_SALIDA: { color: 'secondary', label: 'Trans. salida' },
-  TRANSFERENCIA_ENTRADA: { color: 'primary', label: 'Trans. entrada' },
 }
 
 function resolveTabFromQuery(): OperacionTab {
@@ -116,16 +114,17 @@ async function loadCatalogos() {
   }
 }
 
-async function loadMovimientos() {
-  loadingMovimientos.value = true
-  try {
-    const { data } = await inventarioService.getMovimientos()
-    movimientos.value = data
-  } catch (error) {
-    appStore.showError(getErrorMessage(error))
-  } finally {
-    loadingMovimientos.value = false
-  }
+function parseQueryId(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const num = Number(value)
+  return Number.isInteger(num) && num > 0 ? num : null
+}
+
+function applyRouteFilters() {
+  const almacen = parseQueryId(route.query.almacen)
+  const producto = parseQueryId(route.query.producto)
+  if (almacen != null) filterAlmacen.value = almacen
+  if (producto != null) filterProducto.value = producto
 }
 
 async function submitForm() {
@@ -155,21 +154,12 @@ async function submitForm() {
     appStore.showSuccess(tabMeta[activeTab.value].successMsg)
     resetFormFields()
     formRef.value?.resetValidation()
-    await loadMovimientos()
+    await refreshMovimientos()
   } catch (error) {
     appStore.showError(getErrorMessage(error))
   } finally {
     saving.value = false
   }
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleString('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 watch(
@@ -179,9 +169,17 @@ watch(
   },
 )
 
+watch(
+  () => route.query,
+  () => applyRouteFilters(),
+  { deep: true },
+)
+
 onMounted(async () => {
   activeTab.value = resolveTabFromQuery()
-  await Promise.all([loadCatalogos(), loadMovimientos()])
+  applyRouteFilters()
+  await loadCatalogos()
+  await refreshMovimientos()
 
   if (route.query.view === 'historial') {
     requestAnimationFrame(() => {
@@ -315,80 +313,41 @@ onMounted(async () => {
       </v-card>
 
       <div ref="historialRef" class="historial-section">
-        <BaseDataTable
+        <div class="historial-filters">
+          <v-autocomplete
+            v-model="filterProducto"
+            :items="productos"
+            item-title="nombre"
+            item-value="id"
+            label="Filtrar producto"
+            clearable
+            hide-details
+            density="compact"
+            prepend-inner-icon="mdi-package-variant"
+            class="historial-filters__field"
+          />
+          <v-autocomplete
+            v-model="filterAlmacen"
+            :items="almacenes"
+            item-title="nombre"
+            item-value="id"
+            label="Filtrar almacén"
+            clearable
+            hide-details
+            density="compact"
+            prepend-inner-icon="mdi-warehouse"
+            class="historial-filters__field"
+          />
+        </div>
+
+        <MovimientosInventarioTable
           v-model:search="search"
-          :items="movimientos as Record<string, unknown>[]"
-          :headers="headers"
+          :items="movimientosVisibles"
           :loading="loadingMovimientos"
-          title="Historial"
-          subtitle="Movimientos recientes"
-          search-label="Buscar..."
-          empty-subtitle="Los movimientos aparecerán aquí después de registrar operaciones."
-        >
-          <template #actions>
-            <v-btn
-              icon="mdi-refresh"
-              variant="text"
-              size="small"
-              :loading="loadingMovimientos"
-              aria-label="Actualizar historial"
-              @click="loadMovimientos"
-            />
-          </template>
-
-          <template #item.tipo="{ value }">
-            <v-chip
-              :color="tipoConfig[value as TipoMovimiento]?.color ?? 'default'"
-              size="x-small"
-              variant="tonal"
-              label
-            >
-              {{ tipoConfig[value as TipoMovimiento]?.label ?? value }}
-            </v-chip>
-          </template>
-
-          <template #item.producto_id="{ value }">
-            <span class="cell-ellipsis" :title="productoMap[value] ?? String(value)">
-              {{ productoMap[value] ?? value }}
-            </span>
-          </template>
-
-          <template #item.almacen_id="{ value }">
-            <span class="cell-ellipsis" :title="almacenMap[value] ?? String(value)">
-              {{ almacenMap[value] ?? value }}
-            </span>
-          </template>
-
-          <template #item.cantidad="{ value, item }">
-            <span
-              class="cantidad-cell font-weight-medium"
-              :class="{
-                'text-success': item.tipo === 'INGRESO' || item.tipo === 'AJUSTE_POSITIVO' || item.tipo === 'TRANSFERENCIA_ENTRADA',
-                'text-error': item.tipo === 'SALIDA' || item.tipo === 'AJUSTE_NEGATIVO' || item.tipo === 'TRANSFERENCIA_SALIDA',
-              }"
-            >
-              {{ formatInteger(value) }}
-            </span>
-          </template>
-
-          <template #item.stock="{ item }">
-            <span class="stock-delta text-caption">
-              {{ formatInteger(item.cantidad_anterior) }}
-              <v-icon icon="mdi-arrow-right-thin" size="12" />
-              <strong>{{ formatInteger(item.cantidad_nueva) }}</strong>
-            </span>
-          </template>
-
-          <template #item.observaciones="{ value }">
-            <span class="cell-ellipsis text-medium-emphasis" :title="value ?? ''">
-              {{ value || '—' }}
-            </span>
-          </template>
-
-          <template #item.creado_en="{ value }">
-            <span class="text-caption text-medium-emphasis">{{ formatDate(value) }}</span>
-          </template>
-        </BaseDataTable>
+          title="Historial de movimientos"
+          :subtitle="historialSubtitle"
+          @refresh="refreshMovimientos"
+        />
       </div>
     </div>
   </div>
@@ -535,6 +494,19 @@ onMounted(async () => {
 .historial-section {
   min-width: 0;
   scroll-margin-top: 72px;
+}
+
+.historial-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px 0;
+}
+
+.historial-filters__field {
+  flex: 1 1 220px;
+  min-width: 200px;
+  max-width: 320px;
 }
 
 .cell-ellipsis {
