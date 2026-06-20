@@ -100,6 +100,23 @@ function productosDisponibles(currentProductoId: number | null) {
   return productos.value.filter((p) => !usedIds.has(p.id))
 }
 
+function productoFilter(_value: string, query: string, item?: { raw: Producto }) {
+  const producto = item?.raw
+  if (!producto) return false
+  const term = query.trim().toLowerCase()
+  if (!term) return true
+  return (
+    producto.nombre.toLowerCase().includes(term) ||
+    producto.codigo.toLowerCase().includes(term) ||
+    (producto.codigo_barras?.toLowerCase().includes(term) ?? false)
+  )
+}
+
+function productoNombre(productoId: number | null): string {
+  if (!productoId) return ''
+  return productoMap.value[productoId] ?? ''
+}
+
 function swapAlmacenes() {
   const origen = form.almacen_origen_id
   form.almacen_origen_id = form.almacen_destino_id
@@ -321,68 +338,81 @@ onMounted(async () => {
               Selecciona almacén origen y destino para agregar productos.
             </v-alert>
 
-            <div v-else class="detalle-table">
-              <div class="detalle-table__head">
-                <span>Producto</span>
-                <span class="text-center">Disp.</span>
-                <span class="text-end">Cant.</span>
-                <span />
-              </div>
-
+            <div v-else class="detalle-list">
               <div
                 v-for="(detalle, index) in detalles"
                 :key="detalle.key"
-                class="detalle-table__row"
+                class="detalle-row"
               >
-                <v-autocomplete
-                  v-model="detalle.producto_id"
-                  :items="productosDisponibles(detalle.producto_id)"
-                  item-title="nombre"
-                  item-value="id"
-                  label="Producto"
-                  density="compact"
-                  hide-details
-                  prepend-inner-icon="mdi-package-variant"
-                  clearable
-                />
-
-                <div class="detalle-table__stock">
-                  <v-skeleton-loader v-if="loadingExistencias" type="text" width="32" />
-                  <span
-                    v-else
-                    class="stock-badge"
-                    :class="{ 'stock-badge--empty': stockOrigen(detalle.producto_id) === null }"
+                <div
+                  class="detalle-row__producto"
+                  :title="productoNombre(detalle.producto_id) || undefined"
+                >
+                  <v-autocomplete
+                    v-model="detalle.producto_id"
+                    :items="productosDisponibles(detalle.producto_id)"
+                    item-title="nombre"
+                    item-value="id"
+                    label="Producto"
+                    placeholder="Buscar por nombre o código"
+                    density="compact"
+                    hide-details
+                    clearable
+                    :custom-filter="productoFilter"
+                    :menu-props="{ maxWidth: 520, contentClass: 'detalle-producto-menu' }"
                   >
-                    {{
-                      detalle.producto_id
-                        ? formatInteger(stockOrigen(detalle.producto_id) ?? 0)
-                        : '—'
-                    }}
-                  </span>
+                    <template #item="{ props, item }">
+                      <v-list-item
+                        v-bind="props"
+                        :title="item.raw.nombre"
+                        :subtitle="item.raw.codigo"
+                        prepend-icon="mdi-package-variant"
+                      />
+                    </template>
+                  </v-autocomplete>
                 </div>
 
-                <v-text-field
-                  v-model.number="detalle.cantidad"
-                  label="Cant."
-                  type="number"
-                  min="1"
-                  step="1"
-                  density="compact"
-                  hide-details="auto"
-                  :rules="detalle.producto_id ? [requiredRule, positiveNumberRule] : []"
-                  :disabled="!detalle.producto_id"
-                  :class="{ 'text-error': cantidadExcedeStock(detalle) }"
-                />
+                <div class="detalle-row__meta">
+                  <div class="detalle-row__stock">
+                    <span class="detalle-row__field-label">Disp.</span>
+                    <v-skeleton-loader v-if="loadingExistencias" type="text" width="32" />
+                    <span
+                      v-else
+                      class="stock-badge"
+                      :class="{ 'stock-badge--empty': stockOrigen(detalle.producto_id) === null }"
+                    >
+                      {{
+                        detalle.producto_id
+                          ? formatInteger(stockOrigen(detalle.producto_id) ?? 0)
+                          : '—'
+                      }}
+                    </span>
+                  </div>
 
-                <v-btn
-                  icon="mdi-close"
-                  variant="text"
-                  size="x-small"
-                  color="error"
-                  :disabled="detalles.length === 1"
-                  aria-label="Quitar línea"
-                  @click="removeDetalle(index)"
-                />
+                  <v-text-field
+                    v-model.number="detalle.cantidad"
+                    label="Cantidad"
+                    type="number"
+                    min="1"
+                    step="1"
+                    density="compact"
+                    hide-details="auto"
+                    :rules="detalle.producto_id ? [requiredRule, positiveNumberRule] : []"
+                    :disabled="!detalle.producto_id"
+                    :class="['detalle-row__cantidad', { 'text-error': cantidadExcedeStock(detalle) }]"
+                  />
+
+                  <v-btn
+                    icon="mdi-close"
+                    variant="text"
+                    size="x-small"
+                    color="error"
+                    class="detalle-row__remove"
+                    :disabled="detalles.length === 1"
+                    aria-label="Quitar línea"
+                    @click="removeDetalle(index)"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -477,7 +507,7 @@ onMounted(async () => {
 
 .transfer-page__grid {
   display: grid;
-  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 500px) minmax(0, 1fr);
   gap: 12px;
   align-items: start;
 }
@@ -562,33 +592,64 @@ onMounted(async () => {
   margin: 10px;
 }
 
-.detalle-table__head,
-.detalle-table__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 52px minmax(68px, 80px) 28px;
-  gap: 6px;
-  align-items: center;
-  padding: 8px 10px;
+.detalle-list {
+  display: flex;
+  flex-direction: column;
 }
 
-.detalle-table__head {
+.detalle-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.detalle-row + .detalle-row {
+  border-top: 1px solid var(--mac-border);
+}
+
+.detalle-row__producto {
+  min-width: 0;
+}
+
+.detalle-row__producto :deep(.v-field__input) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detalle-row__meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 28px;
+  gap: 8px;
+  align-items: start;
+}
+
+.detalle-row__stock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 56px;
+  padding-top: 2px;
+}
+
+.detalle-row__field-label {
   font-size: 0.625rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: rgba(var(--v-theme-on-surface), 0.5);
-  border-bottom: 1px solid var(--mac-border);
-  padding-top: 6px;
-  padding-bottom: 6px;
+  line-height: 1;
 }
 
-.detalle-table__row + .detalle-table__row {
-  border-top: 1px solid var(--mac-border);
+.detalle-row__remove {
+  margin-top: 6px;
 }
 
-.detalle-table__stock {
-  display: flex;
-  justify-content: center;
+.detalle-row__cantidad :deep(input) {
+  font-weight: 600;
+  text-align: right;
 }
 
 .stock-badge {
@@ -648,22 +709,27 @@ onMounted(async () => {
     transform: rotate(90deg);
   }
 
-  .detalle-table__head span:nth-child(2),
-  .detalle-table__head span:nth-child(4) {
-    display: none;
+  .detalle-row__meta {
+    grid-template-columns: minmax(0, 1fr) 28px;
   }
 
-  .detalle-table__head,
-  .detalle-table__row {
-    grid-template-columns: minmax(0, 1fr) minmax(68px, 80px) 28px;
-  }
-
-  .detalle-table__stock {
+  .detalle-row__stock {
     display: none;
   }
 
   .cell-ellipsis {
     max-width: 100px;
   }
+}
+</style>
+
+<style>
+.detalle-producto-menu .v-list-item-title {
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.detalle-producto-menu .v-list-item-subtitle {
+  opacity: 0.72;
 }
 </style>

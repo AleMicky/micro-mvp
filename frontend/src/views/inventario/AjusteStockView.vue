@@ -119,6 +119,23 @@ function productosDisponibles(currentProductoId: number | null) {
   return productos.value.filter((p) => !usedIds.has(p.id))
 }
 
+function productoFilter(_value: string, query: string, item?: { raw: Producto }) {
+  const producto = item?.raw
+  if (!producto) return false
+  const term = query.trim().toLowerCase()
+  if (!term) return true
+  return (
+    producto.nombre.toLowerCase().includes(term) ||
+    producto.codigo.toLowerCase().includes(term) ||
+    (producto.codigo_barras?.toLowerCase().includes(term) ?? false)
+  )
+}
+
+function productoNombre(productoId: number | null): string {
+  if (!productoId) return ''
+  return productoMap.value[productoId] ?? ''
+}
+
 function addDetalle() {
   nextRowKey.value += 1
   detalles.value.push({ key: nextRowKey.value, producto_id: null, cantidad_nueva: null })
@@ -318,69 +335,81 @@ onMounted(async () => {
               Selecciona un almacén para ver el stock actual y agregar productos.
             </v-alert>
 
-            <div v-else class="detalle-table">
-              <div class="detalle-table__head">
-                <span>Producto</span>
-                <span class="text-center">Actual</span>
-                <span class="text-end">Nueva cant.</span>
-                <span />
-              </div>
-
+            <div v-else class="detalle-list">
               <div
                 v-for="(detalle, index) in detalles"
                 :key="detalle.key"
-                class="detalle-table__row"
+                class="detalle-row"
               >
-                <v-autocomplete
-                  v-model="detalle.producto_id"
-                  :items="productosDisponibles(detalle.producto_id)"
-                  item-title="nombre"
-                  item-value="id"
-                  label="Producto"
-                  density="compact"
-                  hide-details
-                  prepend-inner-icon="mdi-package-variant"
-                  clearable
-                  class="detalle-table__producto"
-                />
-
-                <div class="detalle-table__actual">
-                  <v-skeleton-loader v-if="loadingExistencias" type="text" width="32" />
-                  <span
-                    v-else
-                    class="stock-badge"
-                    :class="{ 'stock-badge--empty': stockActual(detalle.producto_id) === null }"
+                <div
+                  class="detalle-row__producto"
+                  :title="productoNombre(detalle.producto_id) || undefined"
+                >
+                  <v-autocomplete
+                    v-model="detalle.producto_id"
+                    :items="productosDisponibles(detalle.producto_id)"
+                    item-title="nombre"
+                    item-value="id"
+                    label="Producto"
+                    placeholder="Buscar por nombre o código"
+                    density="compact"
+                    hide-details
+                    clearable
+                    :custom-filter="productoFilter"
+                    :menu-props="{ maxWidth: 520, contentClass: 'detalle-producto-menu' }"
                   >
-                    {{
-                      detalle.producto_id
-                        ? formatInteger(stockActual(detalle.producto_id) ?? 0)
-                        : '—'
-                    }}
-                  </span>
+                    <template #item="{ props, item }">
+                      <v-list-item
+                        v-bind="props"
+                        :title="item.raw.nombre"
+                        :subtitle="item.raw.codigo"
+                        prepend-icon="mdi-package-variant"
+                      />
+                    </template>
+                  </v-autocomplete>
                 </div>
 
-                <v-text-field
-                  v-model.number="detalle.cantidad_nueva"
-                  label="Nueva cant."
-                  type="number"
-                  min="0"
-                  step="1"
-                  density="compact"
-                  hide-details="auto"
-                  :rules="detalle.producto_id ? cantidadNuevaRules(detalle) : []"
-                  :disabled="!detalle.producto_id"
-                  :class="['detalle-table__nueva', deltaClass(detalle)]"
-                />
+                <div class="detalle-row__meta">
+                  <div class="detalle-row__actual">
+                    <span class="detalle-row__field-label">Actual</span>
+                    <v-skeleton-loader v-if="loadingExistencias" type="text" width="32" />
+                    <span
+                      v-else
+                      class="stock-badge"
+                      :class="{ 'stock-badge--empty': stockActual(detalle.producto_id) === null }"
+                    >
+                      {{
+                        detalle.producto_id
+                          ? formatInteger(stockActual(detalle.producto_id) ?? 0)
+                          : '—'
+                      }}
+                    </span>
+                  </div>
 
-                <v-btn
-                  icon="mdi-close"
-                  variant="text"
-                  size="x-small"
-                  color="error"
-                  :disabled="detalles.length === 1"
-                  aria-label="Quitar línea"
-                  @click="removeDetalle(index)"
-                />
+                  <v-text-field
+                    v-model.number="detalle.cantidad_nueva"
+                    label="Nueva cantidad"
+                    type="number"
+                    min="0"
+                    step="1"
+                    density="compact"
+                    hide-details="auto"
+                    :rules="detalle.producto_id ? cantidadNuevaRules(detalle) : []"
+                    :disabled="!detalle.producto_id"
+                    :class="['detalle-row__nueva', deltaClass(detalle)]"
+                  />
+
+                  <v-btn
+                    icon="mdi-close"
+                    variant="text"
+                    size="x-small"
+                    color="error"
+                    class="detalle-row__remove"
+                    :disabled="detalles.length === 1"
+                    aria-label="Quitar línea"
+                    @click="removeDetalle(index)"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -477,7 +506,7 @@ onMounted(async () => {
 
 .ajuste-page__grid {
   display: grid;
-  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 500px) minmax(0, 1fr);
   gap: 12px;
   align-items: start;
 }
@@ -558,33 +587,59 @@ onMounted(async () => {
   margin: 10px;
 }
 
-.detalle-table__head,
-.detalle-table__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 56px minmax(72px, 88px) 28px;
-  gap: 6px;
-  align-items: center;
-  padding: 8px 10px;
+.detalle-list {
+  display: flex;
+  flex-direction: column;
 }
 
-.detalle-table__head {
+.detalle-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.detalle-row + .detalle-row {
+  border-top: 1px solid var(--mac-border);
+}
+
+.detalle-row__producto {
+  min-width: 0;
+}
+
+.detalle-row__producto :deep(.v-field__input) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detalle-row__meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 28px;
+  gap: 8px;
+  align-items: start;
+}
+
+.detalle-row__actual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 56px;
+  padding-top: 2px;
+}
+
+.detalle-row__field-label {
   font-size: 0.625rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: rgba(var(--v-theme-on-surface), 0.5);
-  border-bottom: 1px solid var(--mac-border);
-  padding-top: 6px;
-  padding-bottom: 6px;
+  line-height: 1;
 }
 
-.detalle-table__row + .detalle-table__row {
-  border-top: 1px solid var(--mac-border);
-}
-
-.detalle-table__actual {
-  display: flex;
-  justify-content: center;
+.detalle-row__remove {
+  margin-top: 6px;
 }
 
 .stock-badge {
@@ -606,7 +661,7 @@ onMounted(async () => {
   color: rgba(var(--v-theme-on-surface), 0.4);
 }
 
-.detalle-table__nueva :deep(input) {
+.detalle-row__nueva :deep(input) {
   font-weight: 600;
   text-align: right;
 }
@@ -652,22 +707,27 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 
-  .detalle-table__head span:nth-child(2),
-  .detalle-table__head span:nth-child(4) {
-    display: none;
+  .detalle-row__meta {
+    grid-template-columns: minmax(0, 1fr) 28px;
   }
 
-  .detalle-table__head,
-  .detalle-table__row {
-    grid-template-columns: minmax(0, 1fr) minmax(72px, 88px) 28px;
-  }
-
-  .detalle-table__actual {
+  .detalle-row__actual {
     display: none;
   }
 
   .cell-ellipsis {
     max-width: 100px;
   }
+}
+</style>
+
+<style>
+.detalle-producto-menu .v-list-item-title {
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.detalle-producto-menu .v-list-item-subtitle {
+  opacity: 0.72;
 }
 </style>
