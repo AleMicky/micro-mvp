@@ -1,7 +1,9 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
-import type { ApiError } from '@/types/auth.types'
+import type { ApiError, TokenResponse } from '@/types/auth.types'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const TOKEN_EXPIRES_KEY = 'token_expires_at'
+const REFRESH_MARGIN_MS = 60_000
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -12,6 +14,7 @@ export const api = axios.create({
 
 let isRefreshing = false
 let sessionExpiredHandled = false
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
 let failedQueue: Array<{
   resolve: (token: string) => void
   reject: (error: unknown) => void
@@ -35,9 +38,129 @@ function processQueue(error: unknown, token: string | null = null) {
   failedQueue = []
 }
 
+function decodeTokenExpiry(accessToken: string): number | null {
+  try {
+    const payload = JSON.parse(atob(accessToken.split('.')[1])) as { exp?: number }
+    return payload.exp ? payload.exp * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+function getAccessTokenExpiry(): number | null {
+  const stored = localStorage.getItem(TOKEN_EXPIRES_KEY)
+  if (stored) {
+    const expiresAt = Number(stored)
+    if (!Number.isNaN(expiresAt)) return expiresAt
+  }
+
+  const accessToken = localStorage.getItem('access_token')
+  if (!accessToken) return null
+  return decodeTokenExpiry(accessToken)
+}
+
+function isAccessTokenExpired(marginMs = REFRESH_MARGIN_MS): boolean {
+  const expiresAt = getAccessTokenExpiry()
+  if (!expiresAt) return false
+  return Date.now() >= expiresAt - marginMs
+}
+
+function clearRefreshTimer() {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer)
+    refreshTimer = null
+  }
+}
+
+function scheduleTokenRefresh() {
+  clearRefreshTimer()
+
+  const refreshToken = localStorage.getItem('refresh_token')
+  if (!refreshToken) return
+
+  const expiresAt = getAccessTokenExpiry()
+  if (!expiresAt) return
+
+  const delay = Math.max(expiresAt - Date.now() - REFRESH_MARGIN_MS, 0)
+  refreshTimer = setTimeout(() => {
+    void performTokenRefresh().catch(() => {
+      handleSessionExpired()
+    })
+  }, delay)
+}
+
+async function performTokenRefresh(): Promise<TokenResponse> {
+  const refreshToken = localStorage.getItem('refresh_token')
+  if (!refreshToken) {
+    throw new Error('No refresh token')
+  }
+
+  const { data } = await axios.post<TokenResponse>(`${BASE_URL}/auth/refresh`, {
+    refresh_token: refreshToken,
+  })
+  saveTokens(data.access_token, data.refresh_token, data.expires_in)
+  return data
+}
+
+export function saveTokens(accessToken: string, refreshToken: string, expiresIn?: number) {
+  localStorage.setItem('access_token', accessToken)
+  localStorage.setItem('refresh_token', refreshToken)
+
+  const expiresAt = expiresIn
+    ? Date.now() + expiresIn * 1000
+    : decodeTokenExpiry(accessToken)
+  if (expiresAt) {
+    localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt))
+  }
+
+  scheduleTokenRefresh()
+}
+
+export async function ensureValidSession(): Promise<boolean> {
+  const refreshToken = localStorage.getItem('refresh_token')
+  if (!refreshToken) return !!localStorage.getItem('access_token')
+
+  if (!isAccessTokenExpired()) {
+    scheduleTokenRefresh()
+    return true
+  }
+
+  try {
+    await performTokenRefresh()
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function startSessionKeepAlive() {
+  scheduleTokenRefresh()
+
+  if (typeof document === 'undefined') return
+
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+}
+
+export function stopSessionKeepAlive() {
+  clearRefreshTimer()
+  if (typeof document === 'undefined') return
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState !== 'visible') return
+  if (!localStorage.getItem('refresh_token')) return
+  if (!isAccessTokenExpired()) return
+
+  void performTokenRefresh().catch(() => {
+    handleSessionExpired()
+  })
+}
+
 function handleSessionExpired() {
   if (sessionExpiredHandled) return
   sessionExpiredHandled = true
+  stopSessionKeepAlive()
   clearTokens()
   onSessionExpired?.()
   setTimeout(() => {
@@ -91,11 +214,7 @@ api.interceptors.response.use(
     }
 
     try {
-      const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
-        refresh_token: refreshToken,
-      })
-      localStorage.setItem('access_token', data.access_token)
-      localStorage.setItem('refresh_token', data.refresh_token)
+      const data = await performTokenRefresh()
       processQueue(null, data.access_token)
       originalRequest.headers.Authorization = `Bearer ${data.access_token}`
       return api(originalRequest)
@@ -112,6 +231,8 @@ api.interceptors.response.use(
 export function clearTokens() {
   localStorage.removeItem('access_token')
   localStorage.removeItem('refresh_token')
+  localStorage.removeItem(TOKEN_EXPIRES_KEY)
+  clearRefreshTimer()
 }
 
 export function getErrorMessage(error: unknown): string {

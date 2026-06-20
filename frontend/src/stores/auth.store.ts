@@ -1,7 +1,14 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { authService } from '@/services/auth.service'
-import { clearTokens, getErrorMessage } from '@/services/api'
+import {
+  clearTokens,
+  ensureValidSession,
+  getErrorMessage,
+  saveTokens,
+  startSessionKeepAlive,
+  stopSessionKeepAlive,
+} from '@/services/api'
 import type { LoginRequest, MeResponse } from '@/types/auth.types'
 import { useAppStore } from './app.store'
 
@@ -16,6 +23,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function resetSession(showMessage = false) {
     user.value = null
+    stopSessionKeepAlive()
     clearTokens()
     if (showMessage) {
       useAppStore().showInfo('Tu sesión ha expirado. Inicia sesión nuevamente.')
@@ -28,8 +36,8 @@ export const useAuthStore = defineStore('auth', () => {
     lastError.value = ''
     try {
       const { data } = await authService.login(payload)
-      localStorage.setItem('access_token', data.access_token)
-      localStorage.setItem('refresh_token', data.refresh_token)
+      saveTokens(data.access_token, data.refresh_token, data.expires_in)
+      startSessionKeepAlive()
       await fetchMe()
       appStore.showSuccess('Sesión iniciada correctamente')
       return true
@@ -73,9 +81,15 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
     try {
+      const sessionValid = await ensureValidSession()
+      if (!sessionValid) {
+        resetSession(true)
+        return
+      }
+      startSessionKeepAlive()
       await fetchMe()
     } catch {
-      resetSession()
+      resetSession(true)
     } finally {
       initialized.value = true
     }
