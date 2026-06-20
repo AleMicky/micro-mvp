@@ -7,6 +7,7 @@ import { catalogosService } from '@/services/catalogos.service'
 import { getErrorMessage } from '@/services/api'
 import { useAppStore } from '@/stores/app.store'
 import { requiredRule } from '@/utils/validation'
+import { formatMoney } from '@/utils/format'
 import type { Categoria, Marca, PrecioProducto, Producto, UnidadMedida } from '@/types/catalogos.types'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -106,6 +107,53 @@ const precioPromedioCategoria = computed(() => {
   return sum / conPrecio.length
 })
 
+function flattenProductoBusqueda(producto: Producto): string {
+  return [
+    producto.codigo,
+    producto.codigo_barras,
+    producto.nombre,
+    producto.descripcion,
+    marcaMap.value[producto.marca_id ?? 0],
+    unidadMap.value[producto.unidad_medida_id]?.abreviatura,
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+const productosVisibles = computed(() => {
+  const term = searchProductos.value.trim().toLowerCase()
+  if (!term) return productos.value
+  return productos.value.filter((p) => flattenProductoBusqueda(p).toLowerCase().includes(term))
+})
+
+const resumenTabla = computed(() => {
+  const items = productosVisibles.value
+  let sumVenta = 0
+  let sumCosto = 0
+  let conVenta = 0
+  let conCosto = 0
+
+  for (const p of items) {
+    const venta = Number(p.precio_actual)
+    const costo = Number(p.precio_base)
+    if (Number.isFinite(venta) && venta > 0) {
+      sumVenta += venta
+      conVenta++
+    }
+    if (Number.isFinite(costo) && costo > 0) {
+      sumCosto += costo
+      conCosto++
+    }
+  }
+
+  return {
+    cantidad: items.length,
+    sumVenta: conVenta ? sumVenta : null,
+    sumCosto: conCosto ? sumCosto : null,
+    promVenta: conVenta ? sumVenta / conVenta : null,
+  }
+})
+
 const filteredCategorias = computed(() => {
   const term = searchCategorias.value.trim().toLowerCase()
   if (!term) return categorias.value
@@ -157,11 +205,6 @@ function productoImageUrl(url?: string | null) {
   if (!url) return null
   if (url.startsWith('http')) return url
   return `${API_BASE}${url}`
-}
-
-function formatPrecio(value?: number | null) {
-  if (value == null) return '—'
-  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value)
 }
 
 function formatFecha(value?: string | null) {
@@ -792,10 +835,10 @@ onMounted(async () => {
                       <div class="detail-stat__label">Inactivos</div>
                     </div>
                     <div class="detail-stat">
-                      <v-icon icon="mdi-currency-usd" size="20" color="warning" class="mb-1" />
+                      <v-icon icon="mdi-cash" size="20" color="warning" class="mb-1" />
                       <div class="detail-stat__value detail-stat__value--price">
                         <v-skeleton-loader v-if="isDetailLoading" type="text" width="56" />
-                        <span v-else>{{ formatPrecio(precioPromedioCategoria) }}</span>
+                        <span v-else>{{ formatMoney(precioPromedioCategoria) }}</span>
                       </div>
                       <div class="detail-stat__label">Precio prom.</div>
                     </div>
@@ -858,7 +901,7 @@ onMounted(async () => {
                         </template>
 
                         <template #item.precio_actual="{ value }">
-                          <span class="detail-price-cell">{{ formatPrecio(value) }}</span>
+                          <span class="detail-price-cell">{{ formatMoney(value) }}</span>
                         </template>
 
                         <template #item.marca_id="{ value }">
@@ -896,7 +939,7 @@ onMounted(async () => {
                               <template #activator="{ props }">
                                 <v-btn
                                   v-bind="props"
-                                  icon="mdi-currency-usd"
+                                  icon="mdi-cash"
                                   size="x-small"
                                   variant="text"
                                   @click="openCambiarPrecio(item)"
@@ -941,6 +984,27 @@ onMounted(async () => {
                           </div>
                         </template>
                       </BaseDataTable>
+
+                      <div v-if="productos.length" class="totals-bar">
+                        <div class="totals-bar__cell">
+                          <span class="totals-bar__label">Cantidad</span>
+                          <strong class="totals-bar__value">{{ resumenTabla.cantidad }}</strong>
+                        </div>
+                        <div class="totals-bar__cell">
+                          <span class="totals-bar__label">Σ costos</span>
+                          <strong class="totals-bar__value">{{ formatMoney(resumenTabla.sumCosto) }}</strong>
+                        </div>
+                        <div class="totals-bar__cell">
+                          <span class="totals-bar__label">Σ ventas</span>
+                          <strong class="totals-bar__value totals-bar__value--accent">
+                            {{ formatMoney(resumenTabla.sumVenta) }}
+                          </strong>
+                        </div>
+                        <div class="totals-bar__cell">
+                          <span class="totals-bar__label">Promedio</span>
+                          <strong class="totals-bar__value">{{ formatMoney(resumenTabla.promVenta) }}</strong>
+                        </div>
+                      </div>
                     </div>
                   </v-fade-transition>
                 </div>
@@ -1120,7 +1184,7 @@ onMounted(async () => {
                     min="0"
                     step="0.01"
                     prefix="$"
-                    prepend-inner-icon="mdi-currency-usd"
+                    prepend-inner-icon="mdi-cash"
                     hint="Opcional. Puedes definirlo después."
                     persistent-hint
                     variant="outlined"
@@ -1128,9 +1192,9 @@ onMounted(async () => {
                   />
                   <v-text-field
                     v-else
-                    :model-value="formatPrecio(editingProductoItem?.precio_actual)"
+                    :model-value="formatMoney(editingProductoItem?.precio_actual)"
                     label="Precio actual"
-                    prepend-inner-icon="mdi-currency-usd"
+                    prepend-inner-icon="mdi-cash"
                     hint="Usa «Cambiar precio» en la tabla para actualizarlo."
                     persistent-hint
                     variant="outlined"
@@ -1270,7 +1334,7 @@ onMounted(async () => {
         <div class="form-dialog__header form-dialog__header--price">
           <div class="d-flex align-center ga-3">
             <v-avatar color="white" size="48" rounded="lg">
-              <v-icon icon="mdi-currency-usd" color="warning" />
+              <v-icon icon="mdi-cash" color="warning" />
             </v-avatar>
             <div class="min-w-0">
               <div class="text-h6 font-weight-bold">Actualizar precio</div>
@@ -1297,7 +1361,7 @@ onMounted(async () => {
             <div class="price-product-card__current text-right">
               <div class="text-caption text-medium-emphasis">Precio actual</div>
               <div class="text-h6 font-weight-bold">
-                {{ formatPrecio(precioTarget.precio_actual) }}
+                {{ formatMoney(precioTarget.precio_actual) }}
               </div>
             </div>
           </div>
@@ -1330,7 +1394,7 @@ onMounted(async () => {
               />
               <span>
                 {{ precioVariacion.diff > 0 ? 'Incremento' : 'Reducción' }} de
-                <strong>{{ formatPrecio(Math.abs(precioVariacion.diff)) }}</strong>
+                <strong>{{ formatMoney(Math.abs(precioVariacion.diff)) }}</strong>
                 ({{ precioVariacion.pct > 0 ? '+' : '' }}{{ precioVariacion.pct.toFixed(1) }}%)
               </span>
             </div>
@@ -1386,7 +1450,7 @@ onMounted(async () => {
             <div>
               <div class="text-caption text-medium-emphasis">Precio vigente</div>
               <div class="text-h5 font-weight-bold">
-                {{ formatPrecio(historialTarget.precio_actual ?? precioActivoHistorial?.precio_venta) }}
+                {{ formatMoney(historialTarget.precio_actual ?? precioActivoHistorial?.precio_venta) }}
               </div>
             </div>
             <v-chip
@@ -1415,7 +1479,7 @@ onMounted(async () => {
               </div>
               <div class="history-timeline__content">
                 <div class="d-flex align-center justify-space-between ga-2 flex-wrap">
-                  <div class="text-h6 font-weight-bold">{{ formatPrecio(precio.precio_venta) }}</div>
+                  <div class="text-h6 font-weight-bold">{{ formatMoney(precio.precio_venta) }}</div>
                   <v-chip
                     :color="precio.activo ? 'success' : 'default'"
                     size="x-small"
@@ -1614,6 +1678,48 @@ onMounted(async () => {
 .detail-price-cell {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  color: rgb(var(--v-theme-primary));
+}
+
+.totals-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 1px;
+  margin-top: -1px;
+  border: 1px solid var(--mac-border);
+  border-radius: 0 0 var(--mac-radius) var(--mac-radius);
+  overflow: hidden;
+  background: rgba(var(--v-theme-primary), 0.04);
+}
+
+.totals-bar__cell {
+  flex: 1 1 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 12px;
+  background: #fff;
+  min-width: 0;
+}
+
+.totals-bar__label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(var(--v-theme-on-surface), 0.5);
+}
+
+.totals-bar__value {
+  font-size: var(--mac-text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--v-theme-on-surface));
+  white-space: nowrap;
+}
+
+.totals-bar__value--accent {
   color: rgb(var(--v-theme-primary));
 }
 

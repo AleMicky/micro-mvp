@@ -86,6 +86,7 @@ export interface Producto {
   marca_id: number | null
   unidad_medida_id: number
   imagen_url?: string
+  precio_base?: number
   precio_actual?: number
   activo: boolean
   creado_en: string
