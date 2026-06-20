@@ -15,10 +15,14 @@ $$ LANGUAGE plpgsql;
 -- ── 1. almacenes ────────────────────────────────────────────
 CREATE TABLE almacenes (
     id              SERIAL          PRIMARY KEY,
+    sucursal_id     INTEGER,
+    sucursal_codigo VARCHAR(50),
+    sucursal_nombre VARCHAR(200),
+    compania_id     INTEGER,
+    compania_nombre VARCHAR(200),
     codigo          VARCHAR(50)     NOT NULL,
     nombre          VARCHAR(150)    NOT NULL,
     direccion       TEXT,
-    sucursal_id     INTEGER,
     activo          BOOLEAN         NOT NULL DEFAULT TRUE,
     creado_en       TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     actualizado_en  TIMESTAMPTZ     NOT NULL DEFAULT NOW(),

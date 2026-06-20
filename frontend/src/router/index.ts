@@ -90,9 +90,16 @@ const router = createRouter({
           component: () => import('@/views/inventario/ExistenciasView.vue'),
         },
         {
+          path: 'inventario/operaciones',
+          name: 'stock-operaciones',
+          component: () => import('@/views/inventario/StockOperacionesView.vue'),
+        },
+        {
           path: 'inventario/movimientos',
-          name: 'movimientos',
-          component: () => import('@/views/inventario/MovimientosView.vue'),
+          redirect: (to) => ({
+            name: 'stock-operaciones',
+            query: { ...to.query, view: 'historial' },
+          }),
         },
         {
           path: 'inventario/kardex',
@@ -101,13 +108,17 @@ const router = createRouter({
         },
         {
           path: 'inventario/ingreso',
-          name: 'ingreso-stock',
-          component: () => import('@/views/inventario/IngresoStockView.vue'),
+          redirect: (to) => ({
+            name: 'stock-operaciones',
+            query: { ...to.query, tab: 'ingreso' },
+          }),
         },
         {
           path: 'inventario/salida',
-          name: 'salida-stock',
-          component: () => import('@/views/inventario/SalidaStockView.vue'),
+          redirect: (to) => ({
+            name: 'stock-operaciones',
+            query: { ...to.query, tab: 'salida' },
+          }),
         },
         {
           path: 'inventario/ajuste',

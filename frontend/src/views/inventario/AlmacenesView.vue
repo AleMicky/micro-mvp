@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import BaseDataTable from '@/components/BaseDataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { companyService } from '@/services/company.service'
 import { inventarioService } from '@/services/inventario.service'
 import { getErrorMessage } from '@/services/api'
 import { useAppStore } from '@/stores/app.store'
 import type { Almacen } from '@/types/inventario.types'
+import type { Compania, Sucursal } from '@/types/company.types'
 
 const appStore = useAppStore()
 
 const items = ref<Almacen[]>([])
+const sucursales = ref<Sucursal[]>([])
+const companias = ref<Compania[]>([])
 const loading = ref(false)
+const loadingSucursales = ref(false)
 const search = ref('')
 const dialog = ref(false)
 const confirmOpen = ref(false)
@@ -23,6 +28,7 @@ const defaultForm = () => ({
   codigo: '',
   nombre: '',
   direccion: '',
+  sucursal_id: null as number | null,
   activo: true,
 })
 
@@ -31,10 +37,45 @@ const form = reactive(defaultForm())
 const headers = [
   { title: 'Código', key: 'codigo' },
   { title: 'Nombre', key: 'nombre' },
-  { title: 'Dirección', key: 'direccion' },
+  { title: 'Sucursal', key: 'sucursal_nombre' },
+  { title: 'Compañía', key: 'compania_nombre' },
   { title: 'Estado', key: 'activo' },
   { title: 'Acciones', key: 'actions', sortable: false, align: 'end' as const },
 ]
+
+const sucursalOptions = computed(() => {
+  const companiaPorId = new Map(companias.value.map((c) => [c.id, c.nombre]))
+  return sucursales.value
+    .filter((s) => s.activo)
+    .map((s) => ({
+      id: s.id,
+      codigo: s.codigo,
+      nombre: s.nombre,
+      compania_id: s.compania_id,
+      compania_nombre: companiaPorId.get(s.compania_id) ?? '—',
+      label: `${companiaPorId.get(s.compania_id) ?? '—'} - ${s.nombre}`,
+    }))
+    .sort((a, b) => {
+      const cmp = a.compania_nombre.localeCompare(b.compania_nombre)
+      return cmp !== 0 ? cmp : a.nombre.localeCompare(b.nombre)
+    })
+})
+
+async function loadSucursales() {
+  loadingSucursales.value = true
+  try {
+    const [sucursalesRes, companiasRes] = await Promise.all([
+      companyService.getSucursales(),
+      companyService.getCompanias(),
+    ])
+    sucursales.value = sucursalesRes.data
+    companias.value = companiasRes.data
+  } catch (error) {
+    appStore.showError(getErrorMessage(error))
+  } finally {
+    loadingSucursales.value = false
+  }
+}
 
 async function loadData() {
   loading.value = true
@@ -60,6 +101,7 @@ function openEdit(item: Almacen) {
     codigo: item.codigo,
     nombre: item.nombre,
     direccion: item.direccion ?? '',
+    sucursal_id: item.sucursal_id ?? null,
     activo: item.activo,
   })
   dialog.value = true
@@ -77,6 +119,7 @@ async function saveItem() {
       codigo: form.codigo,
       nombre: form.nombre,
       direccion: form.direccion || null,
+      sucursal_id: form.sucursal_id,
       activo: form.activo,
     }
     if (editingId.value) {
@@ -111,7 +154,9 @@ async function confirmDelete() {
   }
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await Promise.all([loadData(), loadSucursales()])
+})
 </script>
 
 <template>
@@ -127,7 +172,11 @@ onMounted(loadData)
       <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">Nuevo</v-btn>
     </template>
 
-    <template #item.direccion="{ value }">
+    <template #item.sucursal_nombre="{ value }">
+      {{ value || '—' }}
+    </template>
+
+    <template #item.compania_nombre="{ value }">
       {{ value || '—' }}
     </template>
 
@@ -153,6 +202,19 @@ onMounted(loadData)
           </v-col>
           <v-col cols="12" md="6">
             <v-text-field v-model="form.nombre" label="Nombre" />
+          </v-col>
+          <v-col cols="12">
+            <v-select
+              v-model="form.sucursal_id"
+              :items="sucursalOptions"
+              item-title="label"
+              item-value="id"
+              label="Sucursal"
+              clearable
+              :loading="loadingSucursales"
+              hint="Opcional. Asocia el almacén a una sucursal."
+              persistent-hint
+            />
           </v-col>
           <v-col cols="12">
             <v-textarea v-model="form.direccion" label="Dirección" rows="2" />

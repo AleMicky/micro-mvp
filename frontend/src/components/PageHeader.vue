@@ -8,9 +8,9 @@ defineProps<{
 
 <template>
   <div class="page-header">
-    <div class="d-flex align-center ga-3">
-      <v-avatar v-if="icon" color="primary" variant="tonal" size="40" rounded="lg">
-        <v-icon :icon="icon" />
+    <div class="d-flex align-center ga-2">
+      <v-avatar v-if="icon" color="primary" variant="tonal" size="32" rounded="md">
+        <v-icon :icon="icon" size="18" />
       </v-avatar>
       <div>
         <h1 class="page-header__title">{{ title }}</h1>
@@ -28,31 +28,31 @@ defineProps<{
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
 }
 
 .page-header__title {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1.25;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.2;
   letter-spacing: -0.02em;
-  color: #0f172a;
+  color: #1d1d1f;
 }
 
 .page-header__subtitle {
-  margin: 6px 0 0;
-  color: #64748b;
-  font-size: 0.875rem;
-  line-height: 1.4;
+  margin: 2px 0 0;
+  color: #86868b;
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .page-header__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 </style>

@@ -214,6 +214,7 @@ class StockService:
         await db.flush()
 
         movimientos: list[MovimientoInventario] = []
+        detalles_creados: list[AjusteDetalle] = []
 
         for detalle in payload.detalles:
             await catalogos_client.validar_producto(detalle.producto_id)
@@ -248,15 +249,15 @@ class StockService:
                 else TipoMovimiento.AJUSTE_NEGATIVO
             )
 
-            db.add(
-                AjusteDetalle(
-                    ajuste_id=ajuste.id,
-                    producto_id=detalle.producto_id,
-                    cantidad_anterior=cantidad_anterior,
-                    cantidad_nueva=cantidad_nueva,
-                    diferencia=diferencia,
-                )
+            detalle_ajuste = AjusteDetalle(
+                ajuste_id=ajuste.id,
+                producto_id=detalle.producto_id,
+                cantidad_anterior=cantidad_anterior,
+                cantidad_nueva=cantidad_nueva,
+                diferencia=diferencia,
             )
+            db.add(detalle_ajuste)
+            detalles_creados.append(detalle_ajuste)
 
             movimiento = await self._registrar_movimiento(
                 db,
@@ -273,6 +274,7 @@ class StockService:
             movimientos.append(movimiento)
 
         if not movimientos:
+            await db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="El ajuste no generó cambios en el inventario",
@@ -280,6 +282,10 @@ class StockService:
 
         await db.commit()
         await db.refresh(ajuste)
+        for detalle_ajuste in detalles_creados:
+            await db.refresh(detalle_ajuste)
+        for movimiento in movimientos:
+            await db.refresh(movimiento)
 
         return AjusteInventarioResponse(
             id=ajuste.id,
@@ -290,7 +296,7 @@ class StockService:
             activo=ajuste.activo,
             creado_en=ajuste.creado_en,
             actualizado_en=ajuste.actualizado_en,
-            detalles=ajuste.detalles,
+            detalles=detalles_creados,
             movimientos=movimientos,
         )
 
@@ -317,6 +323,7 @@ class StockService:
         await db.flush()
 
         movimientos: list[MovimientoInventario] = []
+        detalles_creados: list[TransferenciaDetalle] = []
 
         for detalle in payload.detalles:
             await catalogos_client.validar_producto(detalle.producto_id)
@@ -357,13 +364,13 @@ class StockService:
             cantidad_nueva_destino = cantidad_anterior_destino + detalle.cantidad
             existencia_destino.cantidad_actual = cantidad_nueva_destino
 
-            db.add(
-                TransferenciaDetalle(
-                    transferencia_id=transferencia.id,
-                    producto_id=detalle.producto_id,
-                    cantidad=detalle.cantidad,
-                )
+            detalle_transferencia = TransferenciaDetalle(
+                transferencia_id=transferencia.id,
+                producto_id=detalle.producto_id,
+                cantidad=detalle.cantidad,
             )
+            db.add(detalle_transferencia)
+            detalles_creados.append(detalle_transferencia)
 
             movimiento_salida = await self._registrar_movimiento(
                 db,
@@ -393,6 +400,10 @@ class StockService:
 
         await db.commit()
         await db.refresh(transferencia)
+        for detalle_transferencia in detalles_creados:
+            await db.refresh(detalle_transferencia)
+        for movimiento in movimientos:
+            await db.refresh(movimiento)
 
         for detalle in payload.detalles:
             await publish_event(
@@ -416,7 +427,7 @@ class StockService:
             activo=transferencia.activo,
             creado_en=transferencia.creado_en,
             actualizado_en=transferencia.actualizado_en,
-            detalles=transferencia.detalles,
+            detalles=detalles_creados,
             movimientos=movimientos,
         )
 

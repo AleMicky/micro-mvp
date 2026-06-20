@@ -1,23 +1,39 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import BaseDataTable from '@/components/BaseDataTable.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { catalogosService } from '@/services/catalogos.service'
 import { inventarioService } from '@/services/inventario.service'
 import { getErrorMessage } from '@/services/api'
 import { useAppStore } from '@/stores/app.store'
+import { formatInteger } from '@/utils/format'
+import { positiveNumberRule, requiredRule } from '@/utils/validation'
 import type { Producto } from '@/types/catalogos.types'
-import type { Almacen } from '@/types/inventario.types'
+import type { Almacen, MovimientoInventario, TipoMovimiento } from '@/types/inventario.types'
+
+interface DetalleRow {
+  key: number
+  producto_id: number | null
+  cantidad: number | null
+}
 
 const appStore = useAppStore()
 
 const productos = ref<Producto[]>([])
 const almacenes = ref<Almacen[]>([])
-const loading = ref(false)
+const movimientos = ref<MovimientoInventario[]>([])
+const existenciasOrigen = ref<Record<number, number>>({})
+const catalogosReady = ref(false)
+const loadingExistencias = ref(false)
+const loadingMovimientos = ref(false)
 const saving = ref(false)
+const search = ref('')
+const nextRowKey = ref(1)
 
-interface DetalleRow {
-  producto_id: number | null
-  cantidad: number | null
-}
+const formRef = ref<{
+  validate: () => Promise<{ valid: boolean }>
+  resetValidation: () => void
+} | null>(null)
 
 const form = reactive({
   almacen_origen_id: null as number | null,
@@ -25,10 +41,87 @@ const form = reactive({
   observaciones: '',
 })
 
-const detalles = ref<DetalleRow[]>([{ producto_id: null, cantidad: null }])
+const detalles = ref<DetalleRow[]>([{ key: 0, producto_id: null, cantidad: null }])
+
+const productoMap = computed(() => Object.fromEntries(productos.value.map((p) => [p.id, p.nombre])))
+const almacenMap = computed(() => Object.fromEntries(almacenes.value.map((a) => [a.id, a.nombre])))
+
+const almacenesDestino = computed(() =>
+  almacenes.value.filter((a) => a.id !== form.almacen_origen_id),
+)
+
+const almacenesOrigen = computed(() =>
+  almacenes.value.filter((a) => a.id !== form.almacen_destino_id),
+)
+
+const validLineCount = computed(
+  () => detalles.value.filter((d) => d.producto_id && d.cantidad && d.cantidad > 0).length,
+)
+
+const transferenciasFiltradas = computed(() => {
+  const tipos: TipoMovimiento[] = ['TRANSFERENCIA_SALIDA', 'TRANSFERENCIA_ENTRADA']
+  return movimientos.value.filter((m) => {
+    if (!tipos.includes(m.tipo)) return false
+    if (form.almacen_origen_id && m.almacen_id !== form.almacen_origen_id && m.almacen_id !== form.almacen_destino_id) {
+      return false
+    }
+    return true
+  })
+})
+
+const headers = [
+  { title: 'Tipo', key: 'tipo', width: 108 },
+  { title: 'Producto', key: 'producto_id' },
+  { title: 'Almacén', key: 'almacen_id' },
+  { title: 'Cant.', key: 'cantidad', align: 'end' as const, width: 64 },
+  { title: 'Obs.', key: 'observaciones', width: 120 },
+  { title: 'Fecha', key: 'creado_en', width: 130 },
+]
+
+const sameAlmacenRule = () =>
+  form.almacen_origen_id !== form.almacen_destino_id || 'Origen y destino deben ser diferentes'
+
+function stockOrigen(productoId: number | null): number | null {
+  if (!productoId || !form.almacen_origen_id) return null
+  const value = existenciasOrigen.value[productoId]
+  return value !== undefined ? value : null
+}
+
+function cantidadExcedeStock(detalle: DetalleRow): boolean {
+  const stock = stockOrigen(detalle.producto_id)
+  if (stock === null || !detalle.cantidad) return false
+  return detalle.cantidad > stock
+}
+
+function productosDisponibles(currentProductoId: number | null) {
+  const usedIds = new Set(
+    detalles.value.map((d) => d.producto_id).filter((id): id is number => id !== null && id !== currentProductoId),
+  )
+  return productos.value.filter((p) => !usedIds.has(p.id))
+}
+
+function swapAlmacenes() {
+  const origen = form.almacen_origen_id
+  form.almacen_origen_id = form.almacen_destino_id
+  form.almacen_destino_id = origen
+}
+
+function addDetalle() {
+  nextRowKey.value += 1
+  detalles.value.push({ key: nextRowKey.value, producto_id: null, cantidad: null })
+}
+
+function removeDetalle(index: number) {
+  if (detalles.value.length <= 1) return
+  detalles.value.splice(index, 1)
+}
+
+function resetDetalles() {
+  nextRowKey.value += 1
+  detalles.value = [{ key: nextRowKey.value, producto_id: null, cantidad: null }]
+}
 
 async function loadCatalogos() {
-  loading.value = true
   try {
     const [productosRes, almacenesRes] = await Promise.all([
       catalogosService.getProductos(),
@@ -36,43 +129,59 @@ async function loadCatalogos() {
     ])
     productos.value = productosRes.data
     almacenes.value = almacenesRes.data
+    catalogosReady.value = true
   } catch (error) {
     appStore.showError(getErrorMessage(error))
-  } finally {
-    loading.value = false
   }
 }
 
-function addDetalle() {
-  detalles.value.push({ producto_id: null, cantidad: null })
+async function loadExistenciasOrigen(almacenId: number) {
+  loadingExistencias.value = true
+  try {
+    const { data } = await inventarioService.getExistenciasByAlmacen(almacenId)
+    existenciasOrigen.value = Object.fromEntries(data.map((e) => [e.producto_id, e.cantidad_actual]))
+  } catch (error) {
+    appStore.showError(getErrorMessage(error))
+    existenciasOrigen.value = {}
+  } finally {
+    loadingExistencias.value = false
+  }
 }
 
-function removeDetalle(index: number) {
-  if (detalles.value.length > 1) {
-    detalles.value.splice(index, 1)
+async function loadMovimientos() {
+  loadingMovimientos.value = true
+  try {
+    const { data } = await inventarioService.getMovimientos()
+    movimientos.value = data
+  } catch (error) {
+    appStore.showError(getErrorMessage(error))
+  } finally {
+    loadingMovimientos.value = false
   }
 }
 
 async function submitForm() {
-  if (!form.almacen_origen_id || !form.almacen_destino_id) {
-    appStore.showError('Seleccione almacén origen y destino')
-    return
-  }
-  if (form.almacen_origen_id === form.almacen_destino_id) {
-    appStore.showError('El almacén origen y destino deben ser diferentes')
-    return
-  }
-  const validDetalles = detalles.value.filter((d) => d.producto_id && d.cantidad)
+  const validation = await formRef.value?.validate()
+  if (!validation?.valid) return
+
+  const validDetalles = detalles.value.filter((d) => d.producto_id && d.cantidad && d.cantidad > 0)
   if (!validDetalles.length) {
-    appStore.showError('Agregue al menos un detalle válido')
+    appStore.showError('Agregue al menos un producto con cantidad')
     return
   }
+
+  const excede = validDetalles.some((d) => cantidadExcedeStock(d))
+  if (excede) {
+    appStore.showError('Una o más cantidades superan el stock disponible en origen')
+    return
+  }
+
   saving.value = true
   try {
     await inventarioService.transferenciaStock({
-      almacen_origen_id: form.almacen_origen_id,
-      almacen_destino_id: form.almacen_destino_id,
-      observaciones: form.observaciones || null,
+      almacen_origen_id: form.almacen_origen_id!,
+      almacen_destino_id: form.almacen_destino_id!,
+      observaciones: form.observaciones.trim() || null,
       detalles: validDetalles.map((d) => ({
         producto_id: d.producto_id!,
         cantidad: d.cantidad!,
@@ -80,7 +189,12 @@ async function submitForm() {
     })
     appStore.showSuccess('Transferencia registrada')
     form.observaciones = ''
-    detalles.value = [{ producto_id: null, cantidad: null }]
+    resetDetalles()
+    formRef.value?.resetValidation()
+    await Promise.all([
+      loadMovimientos(),
+      form.almacen_origen_id ? loadExistenciasOrigen(form.almacen_origen_id) : Promise.resolve(),
+    ])
   } catch (error) {
     appStore.showError(getErrorMessage(error))
   } finally {
@@ -88,83 +202,468 @@ async function submitForm() {
   }
 }
 
-onMounted(loadCatalogos)
+function formatDate(value: string) {
+  return new Date(value).toLocaleString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+watch(
+  () => form.almacen_origen_id,
+  async (almacenId) => {
+    if (almacenId) {
+      await loadExistenciasOrigen(almacenId)
+    } else {
+      existenciasOrigen.value = {}
+    }
+  },
+)
+
+onMounted(async () => {
+  await Promise.all([loadCatalogos(), loadMovimientos()])
+})
 </script>
 
 <template>
-  <v-card max-width="900">
-    <v-card-title>Transferencia entre almacenes</v-card-title>
-    <v-card-subtitle>Mover stock de un almacén a otro</v-card-subtitle>
-    <v-card-text>
-      <v-row>
-        <v-col cols="12" md="6">
-          <v-select
-            v-model="form.almacen_origen_id"
-            :items="almacenes"
-            item-title="nombre"
-            item-value="id"
-            label="Almacén origen"
-            :loading="loading"
-          />
-        </v-col>
-        <v-col cols="12" md="6">
-          <v-select
-            v-model="form.almacen_destino_id"
-            :items="almacenes"
-            item-title="nombre"
-            item-value="id"
-            label="Almacén destino"
-            :loading="loading"
-          />
-        </v-col>
-        <v-col cols="12">
-          <v-textarea v-model="form.observaciones" label="Observaciones" rows="2" />
-        </v-col>
-      </v-row>
+  <div class="transfer-page">
+    <PageHeader
+      title="Transferencia de stock"
+      subtitle="Mueve mercancía entre almacenes"
+      icon="mdi-truck-delivery-outline"
+    />
 
-      <v-divider class="my-4" />
+    <div class="transfer-page__grid">
+      <v-card class="transfer-panel" border elevation="0">
+        <div class="transfer-panel__header">
+          <div class="transfer-panel__title">
+            <v-icon icon="mdi-swap-horizontal" size="16" color="primary" />
+            <span>Nueva transferencia</span>
+          </div>
+          <v-chip v-if="validLineCount" size="x-small" variant="tonal" color="primary" label>
+            {{ validLineCount }} producto(s)
+          </v-chip>
+        </div>
 
-      <div class="d-flex align-center justify-space-between mb-3">
-        <span class="text-subtitle-1 font-weight-medium">Productos a transferir</span>
-        <v-btn size="small" prepend-icon="mdi-plus" variant="tonal" @click="addDetalle">Agregar línea</v-btn>
-      </div>
+        <v-form ref="formRef" class="transfer-form" @submit.prevent="submitForm">
+          <div class="almacenes-row">
+            <v-autocomplete
+              v-model="form.almacen_origen_id"
+              :items="almacenesOrigen"
+              item-title="nombre"
+              item-value="id"
+              label="Origen"
+              density="compact"
+              hide-details="auto"
+              :rules="[requiredRule, sameAlmacenRule]"
+              prepend-inner-icon="mdi-warehouse"
+              clearable
+              class="almacenes-row__field"
+            />
+            <v-btn
+              icon="mdi-swap-horizontal"
+              variant="text"
+              size="x-small"
+              color="primary"
+              class="almacenes-row__swap"
+              :disabled="!form.almacen_origen_id && !form.almacen_destino_id"
+              aria-label="Intercambiar almacenes"
+              @click="swapAlmacenes"
+            />
+            <v-autocomplete
+              v-model="form.almacen_destino_id"
+              :items="almacenesDestino"
+              item-title="nombre"
+              item-value="id"
+              label="Destino"
+              density="compact"
+              hide-details="auto"
+              :rules="[requiredRule, sameAlmacenRule]"
+              prepend-inner-icon="mdi-warehouse"
+              clearable
+              class="almacenes-row__field"
+            />
+          </div>
 
-      <v-row v-for="(detalle, index) in detalles" :key="index" align="center">
-        <v-col cols="12" md="5">
-          <v-select
-            v-model="detalle.producto_id"
-            :items="productos"
-            item-title="nombre"
-            item-value="id"
-            label="Producto"
-            :loading="loading"
-          />
-        </v-col>
-        <v-col cols="12" md="5">
           <v-text-field
-            v-model.number="detalle.cantidad"
-            label="Cantidad"
-            type="number"
-            min="0"
-            step="0.01"
+            v-model="form.observaciones"
+            label="Observaciones"
+            density="compact"
+            hide-details
+            placeholder="Opcional"
+            prepend-inner-icon="mdi-note-text-outline"
           />
-        </v-col>
-        <v-col cols="12" md="2">
-          <v-btn
-            icon="mdi-delete"
-            variant="text"
-            color="error"
-            :disabled="detalles.length === 1"
-            @click="removeDetalle(index)"
-          />
-        </v-col>
-      </v-row>
-    </v-card-text>
-    <v-card-actions>
-      <v-spacer />
-      <v-btn color="primary" variant="flat" prepend-icon="mdi-truck-delivery" :loading="saving" @click="submitForm">
-        Registrar transferencia
-      </v-btn>
-    </v-card-actions>
-  </v-card>
+
+          <div class="detalle-block">
+            <div class="detalle-block__head">
+              <span class="detalle-block__label">Productos</span>
+              <v-btn
+                size="x-small"
+                variant="tonal"
+                color="primary"
+                prepend-icon="mdi-plus"
+                :disabled="!form.almacen_origen_id || !form.almacen_destino_id"
+                @click="addDetalle"
+              >
+                Agregar
+              </v-btn>
+            </div>
+
+            <v-alert
+              v-if="!form.almacen_origen_id || !form.almacen_destino_id"
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="detalle-block__alert"
+            >
+              Selecciona almacén origen y destino para agregar productos.
+            </v-alert>
+
+            <div v-else class="detalle-table">
+              <div class="detalle-table__head">
+                <span>Producto</span>
+                <span class="text-center">Disp.</span>
+                <span class="text-end">Cant.</span>
+                <span />
+              </div>
+
+              <div
+                v-for="(detalle, index) in detalles"
+                :key="detalle.key"
+                class="detalle-table__row"
+              >
+                <v-autocomplete
+                  v-model="detalle.producto_id"
+                  :items="productosDisponibles(detalle.producto_id)"
+                  item-title="nombre"
+                  item-value="id"
+                  label="Producto"
+                  density="compact"
+                  hide-details
+                  prepend-inner-icon="mdi-package-variant"
+                  clearable
+                />
+
+                <div class="detalle-table__stock">
+                  <v-skeleton-loader v-if="loadingExistencias" type="text" width="32" />
+                  <span
+                    v-else
+                    class="stock-badge"
+                    :class="{ 'stock-badge--empty': stockOrigen(detalle.producto_id) === null }"
+                  >
+                    {{
+                      detalle.producto_id
+                        ? formatInteger(stockOrigen(detalle.producto_id) ?? 0)
+                        : '—'
+                    }}
+                  </span>
+                </div>
+
+                <v-text-field
+                  v-model.number="detalle.cantidad"
+                  label="Cant."
+                  type="number"
+                  min="1"
+                  step="1"
+                  density="compact"
+                  hide-details="auto"
+                  :rules="detalle.producto_id ? [requiredRule, positiveNumberRule] : []"
+                  :disabled="!detalle.producto_id"
+                  :class="{ 'text-error': cantidadExcedeStock(detalle) }"
+                />
+
+                <v-btn
+                  icon="mdi-close"
+                  variant="text"
+                  size="x-small"
+                  color="error"
+                  :disabled="detalles.length === 1"
+                  aria-label="Quitar línea"
+                  @click="removeDetalle(index)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="transfer-form__footer">
+            <v-btn
+              color="primary"
+              variant="flat"
+              size="small"
+              block
+              prepend-icon="mdi-truck-delivery-outline"
+              :loading="saving"
+              :disabled="!catalogosReady || !form.almacen_origen_id || !form.almacen_destino_id"
+              type="submit"
+            >
+              Registrar transferencia
+            </v-btn>
+          </div>
+        </v-form>
+      </v-card>
+
+      <div class="historial-section">
+        <BaseDataTable
+          v-model:search="search"
+          :items="transferenciasFiltradas as Record<string, unknown>[]"
+          :headers="headers"
+          :loading="loadingMovimientos"
+          title="Transferencias recientes"
+          subtitle="Historial de movimientos entre almacenes"
+          search-label="Buscar..."
+          empty-subtitle="Las transferencias registradas aparecerán aquí."
+        >
+          <template #actions>
+            <v-btn
+              icon="mdi-refresh"
+              variant="text"
+              size="small"
+              :loading="loadingMovimientos"
+              aria-label="Actualizar historial"
+              @click="loadMovimientos"
+            />
+          </template>
+
+          <template #item.tipo="{ value }">
+            <v-chip
+              :color="value === 'TRANSFERENCIA_ENTRADA' ? 'success' : 'secondary'"
+              size="x-small"
+              variant="tonal"
+              label
+            >
+              {{ value === 'TRANSFERENCIA_ENTRADA' ? 'Entrada' : 'Salida' }}
+            </v-chip>
+          </template>
+
+          <template #item.producto_id="{ value }">
+            <span class="cell-ellipsis" :title="productoMap[value] ?? String(value)">
+              {{ productoMap[value] ?? value }}
+            </span>
+          </template>
+
+          <template #item.almacen_id="{ value }">
+            <span class="cell-ellipsis" :title="almacenMap[value] ?? String(value)">
+              {{ almacenMap[value] ?? value }}
+            </span>
+          </template>
+
+          <template #item.cantidad="{ value }">
+            <span class="font-weight-medium">{{ formatInteger(value) }}</span>
+          </template>
+
+          <template #item.observaciones="{ value }">
+            <span class="cell-ellipsis text-medium-emphasis" :title="value ?? ''">
+              {{ value || '—' }}
+            </span>
+          </template>
+
+          <template #item.creado_en="{ value }">
+            <span class="text-caption text-medium-emphasis">{{ formatDate(value) }}</span>
+          </template>
+        </BaseDataTable>
+      </div>
+    </div>
+  </div>
 </template>
+
+<style scoped>
+.transfer-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.transfer-page__grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.transfer-panel {
+  position: sticky;
+  top: calc(var(--mac-topbar-h) + 12px);
+  overflow: hidden;
+  background: #fff;
+}
+
+.transfer-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: rgb(var(--v-theme-primary));
+  border-radius: 3px 0 0 3px;
+}
+
+.transfer-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px 10px 16px;
+  border-bottom: 1px solid var(--mac-border);
+}
+
+.transfer-panel__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--mac-text-sm);
+  font-weight: 600;
+}
+
+.transfer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px 16px;
+}
+
+.almacenes-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.almacenes-row__swap {
+  margin-top: 6px;
+}
+
+.detalle-block {
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  overflow: hidden;
+  background: rgba(var(--v-theme-primary), 0.02);
+}
+
+.detalle-block__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(var(--v-theme-on-surface), 0.03);
+  border-bottom: 1px solid var(--mac-border);
+}
+
+.detalle-block__label {
+  font-size: var(--mac-text-xs);
+  font-weight: 600;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.detalle-block__alert {
+  margin: 10px;
+}
+
+.detalle-table__head,
+.detalle-table__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px minmax(68px, 80px) 28px;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 10px;
+}
+
+.detalle-table__head {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(var(--v-theme-on-surface), 0.5);
+  border-bottom: 1px solid var(--mac-border);
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.detalle-table__row + .detalle-table__row {
+  border-top: 1px solid var(--mac-border);
+}
+
+.detalle-table__stock {
+  display: flex;
+  justify-content: center;
+}
+
+.stock-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: rgba(var(--v-theme-on-surface), 0.06);
+  font-size: var(--mac-text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-badge--empty {
+  color: rgba(var(--v-theme-on-surface), 0.4);
+}
+
+.transfer-form__footer {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--mac-border);
+}
+
+.historial-section {
+  min-width: 0;
+}
+
+.cell-ellipsis {
+  display: block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .transfer-page__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .transfer-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .almacenes-row {
+    grid-template-columns: 1fr;
+  }
+
+  .almacenes-row__swap {
+    justify-self: center;
+    margin: 0;
+    transform: rotate(90deg);
+  }
+
+  .detalle-table__head span:nth-child(2),
+  .detalle-table__head span:nth-child(4) {
+    display: none;
+  }
+
+  .detalle-table__head,
+  .detalle-table__row {
+    grid-template-columns: minmax(0, 1fr) minmax(68px, 80px) 28px;
+  }
+
+  .detalle-table__stock {
+    display: none;
+  }
+
+  .cell-ellipsis {
+    max-width: 100px;
+  }
+}
+</style>

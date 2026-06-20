@@ -6,6 +6,7 @@ import { catalogosService } from '@/services/catalogos.service'
 import { inventarioService } from '@/services/inventario.service'
 import { getErrorMessage } from '@/services/api'
 import { useAppStore } from '@/stores/app.store'
+import { formatInteger } from '@/utils/format'
 import type { Producto } from '@/types/catalogos.types'
 import type { MovimientoInventario } from '@/types/inventario.types'
 
@@ -97,6 +98,18 @@ loadProductos()
       empty-title="Selecciona un producto"
       empty-subtitle="Elige un producto para ver su kardex de movimientos."
     >
+      <template #item.cantidad="{ value }">
+        {{ formatInteger(value) }}
+      </template>
+
+      <template #item.cantidad_anterior="{ value }">
+        {{ formatInteger(value) }}
+      </template>
+
+      <template #item.cantidad_nueva="{ value }">
+        {{ formatInteger(value) }}
+      </template>
+
       <template #item.observaciones="{ value }">
         {{ value || '—' }}
       </template>

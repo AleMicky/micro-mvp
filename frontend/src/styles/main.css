@@ -1,5 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+:root {
+  --mac-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif;
+  --mac-radius: 8px;
+  --mac-radius-sm: 6px;
+  --mac-topbar-h: 44px;
+  --mac-sidebar-w: 220px;
+  --mac-space-xs: 4px;
+  --mac-space-sm: 8px;
+  --mac-space-md: 12px;
+  --mac-space-lg: 16px;
+  --mac-border: rgba(0, 0, 0, 0.08);
+  --mac-text-sm: 0.8125rem;
+  --mac-text-xs: 0.75rem;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -13,38 +28,86 @@ body,
 }
 
 body {
-  font-family: 'Inter', 'Roboto', sans-serif;
-  background-color: #f0f4f8;
+  font-family: var(--mac-font);
+  font-size: var(--mac-text-sm);
+  background-color: #fff8f0;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .v-application {
-  font-family: 'Inter', 'Roboto', sans-serif !important;
+  font-family: var(--mac-font) !important;
+  font-size: var(--mac-text-sm) !important;
+}
+
+/* Densidad compacta global */
+.v-btn {
+  letter-spacing: -0.01em;
+}
+
+.v-btn--size-default {
+  --v-btn-height: 32px;
+  font-size: var(--mac-text-sm);
+}
+
+.v-btn--size-small {
+  --v-btn-height: 28px;
+  font-size: var(--mac-text-xs);
+}
+
+.v-card {
+  border-radius: var(--mac-radius) !important;
+}
+
+.v-field--variant-outlined .v-field__outline {
+  --v-field-border-opacity: 0.12;
+}
+
+.v-data-table {
+  font-size: var(--mac-text-sm) !important;
+}
+
+.v-data-table :deep(.v-data-table__td),
+.v-data-table :deep(.v-data-table__th) {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+.v-data-table--density-compact {
+  --v-table-row-height: 36px;
+}
+
+.v-chip--size-small {
+  font-size: 0.6875rem;
+}
+
+.v-chip--size-x-small {
+  font-size: 0.625rem;
 }
 
 .page-title {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   color: rgb(var(--v-theme-on-surface));
 }
 
 .page-subtitle {
   color: rgba(var(--v-theme-on-surface), 0.62);
-  font-size: 0.95rem;
+  font-size: var(--mac-text-xs);
 }
 
 .stat-card {
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid var(--mac-border);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 32px rgba(21, 101, 192, 0.12) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(198, 40, 40, 0.1) !important;
 }
 
 .form-card {
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  border: 1px solid var(--mac-border);
 }
 
 .fade-enter-active,

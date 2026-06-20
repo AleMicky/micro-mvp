@@ -27,7 +27,7 @@ const { drawer } = storeToRefs(appStore)
 
 <style scoped>
 .admin-main {
-  --admin-bg: #f1f5f9;
+  --admin-bg: #fff8f0;
   background: var(--admin-bg);
   min-height: 100vh;
 }
@@ -35,13 +35,13 @@ const { drawer } = storeToRefs(appStore)
 .admin-content {
   max-width: 1440px;
   margin: 0 auto;
-  padding: 24px 20px 40px;
-  min-height: calc(100vh - 60px);
+  padding: 12px 14px 24px;
+  min-height: calc(100vh - 44px);
 }
 
 @media (min-width: 960px) {
   .admin-content {
-    padding: 32px 40px 48px;
+    padding: 16px 20px 28px;
   }
 }
 

@@ -1,5 +1,4 @@
 from datetime import datetime
-from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,25 +13,42 @@ class AuditoriaResponse(BaseModel):
     actualizado_en: datetime
 
 
+class SucursalSnapshot(BaseModel):
+    id: int
+    codigo: str
+    nombre: str
+
+
+class CompaniaSnapshot(BaseModel):
+    id: int
+    nombre: str
+
+
 class AlmacenBase(AuditoriaSchema):
     codigo: str = Field(..., max_length=50)
     nombre: str = Field(..., max_length=150)
     direccion: str | None = None
-    sucursal_id: int | None = None
 
 
 class AlmacenCreate(AlmacenBase):
-    pass
+    sucursal_id: int | None = None
 
 
 class AlmacenUpdate(BaseModel):
     codigo: str | None = Field(None, max_length=50)
     nombre: str | None = Field(None, max_length=150)
     direccion: str | None = None
-    sucursal_id: int | None = None
     activo: bool | None = None
+    sucursal_id: int | None = None
 
 
 class AlmacenResponse(AlmacenBase, AuditoriaResponse):
     id: int
+    sucursal_id: int | None = None
+    sucursal_codigo: str | None = None
+    sucursal_nombre: str | None = None
+    compania_id: int | None = None
+    compania_nombre: str | None = None
+    sucursal: SucursalSnapshot | None = None
+    compania: CompaniaSnapshot | None = None
     model_config = ConfigDict(from_attributes=True)

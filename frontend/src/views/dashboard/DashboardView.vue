@@ -92,28 +92,28 @@ onMounted(loadDashboard)
 
     <v-container fluid class="px-0">
       <v-row class="mx-0">
-        <v-col v-for="stat in stats" :key="stat.title" cols="12" sm="6" lg="3" class="px-2">
-          <v-card class="stat-card pa-4" :loading="loading">
+        <v-col v-for="stat in stats" :key="stat.title" cols="12" sm="6" lg="3" class="px-1 pb-2">
+          <v-card class="stat-card pa-3" :loading="loading">
           <div class="d-flex justify-space-between align-start">
             <div>
-              <div class="text-caption text-medium-emphasis mb-1">{{ stat.title }}</div>
-              <div class="text-h4 font-weight-bold">{{ stat.value }}</div>
-              <div class="text-caption text-medium-emphasis mt-2">{{ stat.hint }}</div>
+              <div class="text-caption text-medium-emphasis mb-0">{{ stat.title }}</div>
+              <div class="text-h5 font-weight-bold">{{ stat.value }}</div>
+              <div class="text-caption text-medium-emphasis mt-1">{{ stat.hint }}</div>
             </div>
-            <v-avatar :color="stat.color" variant="tonal" size="48" rounded="lg">
-              <v-icon :icon="stat.icon" size="24" />
+            <v-avatar :color="stat.color" variant="tonal" size="36" rounded="md">
+              <v-icon :icon="stat.icon" size="18" />
             </v-avatar>
           </div>
         </v-card>
       </v-col>
       </v-row>
 
-      <v-card class="mt-6 mx-0" border elevation="0">
-        <v-card-title class="pa-4 pb-2">
-        <div class="text-h6 font-weight-bold">Movimientos recientes</div>
+      <v-card class="mt-3 mx-0" border elevation="0">
+        <v-card-title class="pa-3 pb-1">
+        <div class="text-subtitle-1 font-weight-bold">Movimientos recientes</div>
       </v-card-title>
-        <v-card-text class="pa-4 pt-0">
-        <v-data-table :headers="movimientoHeaders" :items="movimientosRecientes" :loading="loading" item-value="id" hover :items-per-page="8" hide-default-footer>
+        <v-card-text class="pa-3 pt-0">
+        <v-data-table density="compact" :headers="movimientoHeaders" :items="movimientosRecientes" :loading="loading" item-value="id" hover :items-per-page="8" hide-default-footer>
           <template #item.tipo="{ value }">
             <v-chip :color="tipoColors[value] ?? 'default'" size="small" variant="tonal">{{ value }}</v-chip>
           </template>
@@ -127,14 +127,14 @@ onMounted(loadDashboard)
 
 <style scoped>
 .dashboard-page {
-  width: calc(100% + 40px);
-  margin: 0 -20px;
+  width: calc(100% + 28px);
+  margin: 0 -14px;
 }
 
 @media (min-width: 960px) {
   .dashboard-page {
-    width: calc(100% + 80px);
-    margin: 0 -40px;
+    width: calc(100% + 40px);
+    margin: 0 -20px;
   }
 }
 </style>

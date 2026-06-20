@@ -28,9 +28,10 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 20% 20%, rgba(37, 99, 235, 0.18), transparent 35%),
-    radial-gradient(circle at 80% 0%, rgba(56, 189, 248, 0.16), transparent 30%),
-    linear-gradient(135deg, #eff6ff 0%, #f8fafc 45%, #eef2ff 100%);
+    radial-gradient(circle at 20% 20%, rgba(198, 40, 40, 0.14), transparent 35%),
+    radial-gradient(circle at 80% 0%, rgba(230, 81, 0, 0.12), transparent 30%),
+    radial-gradient(circle at 60% 90%, rgba(255, 179, 0, 0.1), transparent 28%),
+    linear-gradient(135deg, #fff8f0 0%, #fff3e0 45%, #ffebee 100%);
 }
 
 .auth-layout__container {

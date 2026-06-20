@@ -2,7 +2,7 @@
 Seed idempotente para datos de desarrollo de ms-inventario.
 
 Requiere que ms-company y ms-catalogos hayan ejecutado su seed primero
-para mantener la correspondencia de sucursal_id y producto_id.
+para resolver sucursales y productos vía HTTP.
 
 Ejecución manual:
     python -m app.seed
@@ -12,8 +12,11 @@ import asyncio
 import logging
 from decimal import Decimal
 
+import httpx
 from sqlalchemy import select
 
+from app.clients.company_client import company_client
+from app.core.config import settings
 from app.core.database import async_session
 from app.crud.existencia import crud_existencia
 from app.enums.tipo_movimiento import ReferenciaTipo, TipoMovimiento
@@ -22,17 +25,6 @@ from app.models.movimiento_inventario import MovimientoInventario
 
 logger = logging.getLogger(__name__)
 
-# IDs esperados según orden de inserción en ms-company (seed idempotente).
-SUCURSAL_ID_BY_CODIGO = {
-    "SUC-CENTRAL": 1,
-    "SUC-NORTE": 2,
-    "SUC-PRADO": 3,
-    "SUC-ALTO": 4,
-    "SUC-HIPER-1": 5,
-    "SUC-MELCHOR": 6,
-}
-
-# IDs esperados según orden de inserción en ms-catalogos.
 PRODUCTO_ID_BY_CODIGO = {
     "PROD-001": 1,
     "PROD-002": 2,
@@ -44,28 +36,28 @@ PRODUCTO_ID_BY_CODIGO = {
 
 ALMACENES_SEED = [
     {
-        "codigo": "ALM-CENTRAL",
-        "nombre": "Almacén Central",
-        "direccion": "SuperMarket Bolivia - Central",
-        "sucursal_codigo": "SUC-CENTRAL",
-    },
-    {
-        "codigo": "ALM-NORTE",
-        "nombre": "Almacén Zona Norte",
-        "direccion": "SuperMarket Bolivia - Zona Norte",
-        "sucursal_codigo": "SUC-NORTE",
-    },
-    {
-        "codigo": "ALM-PRADO",
-        "nombre": "Almacén Sucursal Prado",
-        "direccion": "OXXO Bolivia - Sucursal Prado",
+        "codigo": "ALM-PRADO-GEN",
+        "nombre": "Almacén General Prado",
+        "direccion": "Almacén principal de Sucursal Prado",
         "sucursal_codigo": "SUC-PRADO",
     },
     {
-        "codigo": "ALM-ALTO",
-        "nombre": "Almacén Sucursal El Alto",
-        "direccion": "OXXO Bolivia - Sucursal El Alto",
+        "codigo": "ALM-ELALTO-GEN",
+        "nombre": "Almacén General El Alto",
+        "direccion": "Almacén principal de Sucursal El Alto",
         "sucursal_codigo": "SUC-ALTO",
+    },
+    {
+        "codigo": "ALM-CENTRAL-GEN",
+        "nombre": "Almacén General Central",
+        "direccion": "Almacén principal de Sucursal Central",
+        "sucursal_codigo": "SUC-CENTRAL",
+    },
+    {
+        "codigo": "ALM-ZN-GEN",
+        "nombre": "Almacén General Zona Norte",
+        "direccion": "Almacén principal de Sucursal Zona Norte",
+        "sucursal_codigo": "SUC-NORTE",
     },
     {
         "codigo": "ALM-HIPER-1",
@@ -84,15 +76,15 @@ ALMACENES_SEED = [
 EXISTENCIAS_SEED = [
     {"producto_codigo": "PROD-001", "almacen_codigo": "ALM-HIPER-1", "cantidad_actual": Decimal("18")},
     {"producto_codigo": "PROD-001", "almacen_codigo": "ALM-MELCHOR", "cantidad_actual": Decimal("85")},
-    {"producto_codigo": "PROD-001", "almacen_codigo": "ALM-PRADO", "cantidad_actual": Decimal("48")},
-    {"producto_codigo": "PROD-001", "almacen_codigo": "ALM-ALTO", "cantidad_actual": Decimal("50")},
-    {"producto_codigo": "PROD-002", "almacen_codigo": "ALM-CENTRAL", "cantidad_actual": Decimal("120")},
-    {"producto_codigo": "PROD-002", "almacen_codigo": "ALM-NORTE", "cantidad_actual": Decimal("60")},
-    {"producto_codigo": "PROD-003", "almacen_codigo": "ALM-CENTRAL", "cantidad_actual": Decimal("80")},
-    {"producto_codigo": "PROD-003", "almacen_codigo": "ALM-PRADO", "cantidad_actual": Decimal("40")},
-    {"producto_codigo": "PROD-004", "almacen_codigo": "ALM-CENTRAL", "cantidad_actual": Decimal("90")},
-    {"producto_codigo": "PROD-004", "almacen_codigo": "ALM-ALTO", "cantidad_actual": Decimal("35")},
-    {"producto_codigo": "PROD-005", "almacen_codigo": "ALM-CENTRAL", "cantidad_actual": Decimal("120")},
+    {"producto_codigo": "PROD-001", "almacen_codigo": "ALM-PRADO-GEN", "cantidad_actual": Decimal("48")},
+    {"producto_codigo": "PROD-001", "almacen_codigo": "ALM-ELALTO-GEN", "cantidad_actual": Decimal("50")},
+    {"producto_codigo": "PROD-002", "almacen_codigo": "ALM-CENTRAL-GEN", "cantidad_actual": Decimal("120")},
+    {"producto_codigo": "PROD-002", "almacen_codigo": "ALM-ZN-GEN", "cantidad_actual": Decimal("60")},
+    {"producto_codigo": "PROD-003", "almacen_codigo": "ALM-CENTRAL-GEN", "cantidad_actual": Decimal("80")},
+    {"producto_codigo": "PROD-003", "almacen_codigo": "ALM-PRADO-GEN", "cantidad_actual": Decimal("40")},
+    {"producto_codigo": "PROD-004", "almacen_codigo": "ALM-CENTRAL-GEN", "cantidad_actual": Decimal("90")},
+    {"producto_codigo": "PROD-004", "almacen_codigo": "ALM-ELALTO-GEN", "cantidad_actual": Decimal("35")},
+    {"producto_codigo": "PROD-005", "almacen_codigo": "ALM-CENTRAL-GEN", "cantidad_actual": Decimal("120")},
     {"producto_codigo": "PROD-005", "almacen_codigo": "ALM-MELCHOR", "cantidad_actual": Decimal("80")},
 ]
 
@@ -102,6 +94,28 @@ SEED_OBSERVACION = "Carga inicial de inventario (seed)"
 async def _get_almacen_por_codigo(db, codigo: str) -> Almacen | None:
     stmt = select(Almacen).where(Almacen.codigo == codigo)
     return (await db.execute(stmt)).scalar_one_or_none()
+
+
+def _aplicar_snapshot(almacen: Almacen, snapshot: dict) -> None:
+    almacen.sucursal_id = snapshot["sucursal_id"]
+    almacen.sucursal_codigo = snapshot.get("sucursal_codigo")
+    almacen.sucursal_nombre = snapshot.get("sucursal_nombre")
+    almacen.compania_id = snapshot.get("compania_id")
+    almacen.compania_nombre = snapshot.get("compania_nombre")
+
+
+async def _resolver_snapshots() -> dict[str, dict]:
+    snapshots: dict[str, dict] = {}
+    for data in ALMACENES_SEED:
+        codigo_sucursal = data["sucursal_codigo"]
+        snapshot = await company_client.obtener_snapshot_por_codigo_sucursal(codigo_sucursal)
+        if not snapshot:
+            raise RuntimeError(
+                f"Sucursal {codigo_sucursal} no encontrada en ms-company "
+                f"({settings.ms_company_url}). Ejecute el seed de ms-company primero."
+            )
+        snapshots[data["codigo"]] = snapshot
+    return snapshots
 
 
 async def _existe_movimiento_inicial(
@@ -122,25 +136,32 @@ async def _existe_movimiento_inicial(
 
 
 async def run_seed() -> None:
+    try:
+        snapshots = await _resolver_snapshots()
+    except (RuntimeError, httpx.RequestError) as exc:
+        logger.error("No se pudo consultar ms-company para el seed: %s", exc)
+        raise
+
     async with async_session() as db:
         almacenes_por_codigo: dict[str, Almacen] = {}
 
         for data in ALMACENES_SEED:
             almacen = await _get_almacen_por_codigo(db, data["codigo"])
-            sucursal_id = SUCURSAL_ID_BY_CODIGO[data["sucursal_codigo"]]
+            snapshot = snapshots[data["codigo"]]
 
             if not almacen:
                 almacen = Almacen(
                     codigo=data["codigo"],
                     nombre=data["nombre"],
                     direccion=data["direccion"],
-                    sucursal_id=sucursal_id,
                 )
+                _aplicar_snapshot(almacen, snapshot)
                 db.add(almacen)
                 await db.flush()
                 logger.info("Almacén creado: %s", data["codigo"])
             else:
-                logger.info("Almacén ya existe: %s", data["codigo"])
+                _aplicar_snapshot(almacen, snapshot)
+                logger.info("Almacén ya existe (snapshot actualizado): %s", data["codigo"])
 
             almacenes_por_codigo[data["codigo"]] = almacen
 

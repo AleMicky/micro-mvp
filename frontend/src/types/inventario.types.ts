@@ -11,6 +11,11 @@ export interface Almacen {
   codigo: string
   nombre: string
   direccion: string | null
+  sucursal_id?: number | null
+  sucursal_codigo?: string | null
+  sucursal_nombre?: string | null
+  compania_id?: number | null
+  compania_nombre?: string | null
   activo: boolean
   creado_en: string
   actualizado_en: string
@@ -20,6 +25,7 @@ export interface AlmacenCreate {
   codigo: string
   nombre: string
   direccion?: string | null
+  sucursal_id?: number | null
   activo?: boolean
 }
 
@@ -27,7 +33,16 @@ export interface AlmacenUpdate {
   codigo?: string
   nombre?: string
   direccion?: string | null
+  sucursal_id?: number | null
   activo?: boolean
+}
+
+export interface SucursalOption {
+  id: number
+  codigo: string
+  nombre: string
+  compania_id: number
+  compania_nombre: string
 }
 
 export interface Existencia {

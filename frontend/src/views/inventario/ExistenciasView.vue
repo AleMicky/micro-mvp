@@ -6,6 +6,7 @@ import { catalogosService } from '@/services/catalogos.service'
 import { inventarioService } from '@/services/inventario.service'
 import { getErrorMessage } from '@/services/api'
 import { useAppStore } from '@/stores/app.store'
+import { formatInteger } from '@/utils/format'
 import type { Producto } from '@/types/catalogos.types'
 import type { Almacen, Existencia } from '@/types/inventario.types'
 
@@ -22,13 +23,21 @@ const filterAlmacen = ref<number | null>(null)
 const productoMap = computed(() => Object.fromEntries(productos.value.map((p) => [p.id, p.nombre])))
 const almacenMap = computed(() => Object.fromEntries(almacenes.value.map((a) => [a.id, a.nombre])))
 
+const stats = computed(() => {
+  const bajo = items.value.filter((item) => getStockStatus(item) === 'bajo').length
+  const total = items.value.reduce((sum, item) => sum + Number(item.cantidad_actual), 0)
+  return { filas: items.value.length, bajo, total: Math.trunc(total) }
+})
+
+const hasFilters = computed(() => filterProducto.value !== null || filterAlmacen.value !== null)
+
 const headers = [
   { title: 'Producto', key: 'producto_id' },
   { title: 'Almacén', key: 'almacen_id' },
-  { title: 'Cantidad', key: 'cantidad_actual' },
-  { title: 'Mínimo', key: 'stock_minimo' },
-  { title: 'Máximo', key: 'stock_maximo' },
-  { title: 'Estado', key: 'stock_status' },
+  { title: 'Cant.', key: 'cantidad_actual', align: 'end' as const, width: 72 },
+  { title: 'Mín.', key: 'stock_minimo', align: 'end' as const, width: 64 },
+  { title: 'Máx.', key: 'stock_maximo', align: 'end' as const, width: 64 },
+  { title: 'Estado', key: 'stock_status', width: 96, sortable: false },
 ]
 
 function getStockStatus(item: Existencia) {
@@ -36,6 +45,17 @@ function getStockStatus(item: Existencia) {
   const minimo = Number(item.stock_minimo)
   if (minimo > 0 && actual <= minimo) return 'bajo'
   return 'ok'
+}
+
+function stockLevel(item: Existencia): number {
+  const max = item.stock_maximo ? Number(item.stock_maximo) : Number(item.stock_minimo) * 2 || 100
+  if (max <= 0) return 0
+  return Math.min(100, Math.round((Number(item.cantidad_actual) / max) * 100))
+}
+
+function clearFilters() {
+  filterProducto.value = null
+  filterAlmacen.value = null
 }
 
 async function loadCatalogos() {
@@ -80,69 +100,237 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
+  <div class="existencias-page">
     <PageHeader
       title="Existencias"
       subtitle="Consulta de stock por producto y almacén"
       icon="mdi-package-check"
-    />
+    >
+      <template #actions>
+        <v-btn
+          variant="tonal"
+          size="small"
+          prepend-icon="mdi-refresh"
+          :loading="loading"
+          @click="loadExistencias"
+        >
+          Actualizar
+        </v-btn>
+      </template>
+    </PageHeader>
+
+    <div class="stats-row">
+      <div class="stat-pill">
+        <span class="stat-pill__value">{{ stats.filas }}</span>
+        <span class="stat-pill__label">Registros</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-pill__value">{{ formatInteger(stats.total) }}</span>
+        <span class="stat-pill__label">Unidades totales</span>
+      </div>
+      <div class="stat-pill" :class="{ 'stat-pill--warn': stats.bajo > 0 }">
+        <span class="stat-pill__value">{{ stats.bajo }}</span>
+        <span class="stat-pill__label">Stock bajo</span>
+      </div>
+    </div>
 
     <BaseDataTable
       v-model:search="search"
-      :items="items"
+      :items="items as Record<string, unknown>[]"
       :headers="headers"
       :loading="loading"
-      show-search
+      title="Inventario"
+      subtitle="Existencias actuales"
+      search-label="Buscar producto o almacén..."
       empty-subtitle="Registra ingresos de stock para ver existencias."
     >
       <template #toolbar>
-        <v-select
-          v-model="filterProducto"
-          :items="productos"
-          item-title="nombre"
-          item-value="id"
-          label="Producto"
-          clearable
-          hide-details
-          density="compact"
-          style="min-width: 200px"
-          @update:model-value="filterAlmacen = null"
-        />
-        <v-select
-          v-model="filterAlmacen"
-          :items="almacenes"
-          item-title="nombre"
-          item-value="id"
-          label="Almacén"
-          clearable
-          hide-details
-          density="compact"
-          style="min-width: 200px"
-          @update:model-value="filterProducto = null"
-        />
+        <div class="filters-bar">
+          <v-autocomplete
+            v-model="filterProducto"
+            :items="productos"
+            item-title="nombre"
+            item-value="id"
+            label="Producto"
+            clearable
+            hide-details
+            density="compact"
+            prepend-inner-icon="mdi-package-variant"
+            class="filters-bar__field"
+            @update:model-value="filterAlmacen = null"
+          />
+          <v-autocomplete
+            v-model="filterAlmacen"
+            :items="almacenes"
+            item-title="nombre"
+            item-value="id"
+            label="Almacén"
+            clearable
+            hide-details
+            density="compact"
+            prepend-inner-icon="mdi-warehouse"
+            class="filters-bar__field"
+            @update:model-value="filterProducto = null"
+          />
+          <v-btn
+            v-if="hasFilters"
+            size="x-small"
+            variant="text"
+            prepend-icon="mdi-filter-off-outline"
+            @click="clearFilters"
+          >
+            Limpiar
+          </v-btn>
+        </div>
       </template>
 
       <template #item.producto_id="{ value }">
-        {{ productoMap[value] ?? value }}
+        <span class="cell-ellipsis cell-ellipsis--wide" :title="productoMap[value] ?? String(value)">
+          {{ productoMap[value] ?? value }}
+        </span>
       </template>
 
       <template #item.almacen_id="{ value }">
-        {{ almacenMap[value] ?? value }}
+        <span class="cell-ellipsis" :title="almacenMap[value] ?? String(value)">
+          {{ almacenMap[value] ?? value }}
+        </span>
+      </template>
+
+      <template #item.cantidad_actual="{ value, item }">
+        <div class="qty-cell">
+          <span
+            class="qty-cell__value font-weight-medium"
+            :class="{ 'text-warning': getStockStatus(item as Existencia) === 'bajo' }"
+          >
+            {{ formatInteger(value) }}
+          </span>
+          <v-progress-linear
+            :model-value="stockLevel(item as Existencia)"
+            :color="getStockStatus(item as Existencia) === 'bajo' ? 'warning' : 'success'"
+            height="3"
+            rounded
+            class="qty-cell__bar"
+          />
+        </div>
+      </template>
+
+      <template #item.stock_minimo="{ value }">
+        <span class="text-caption">{{ formatInteger(value) }}</span>
       </template>
 
       <template #item.stock_maximo="{ value }">
-        {{ value ?? '—' }}
+        <span class="text-caption text-medium-emphasis">{{ value != null ? formatInteger(value) : '—' }}</span>
       </template>
 
       <template #item.stock_status="{ item }">
         <v-chip
-          :color="getStockStatus(item) === 'bajo' ? 'warning' : 'success'"
-          size="small"
+          :color="getStockStatus(item as Existencia) === 'bajo' ? 'warning' : 'success'"
+          size="x-small"
           variant="tonal"
+          label
         >
-          {{ getStockStatus(item) === 'bajo' ? 'Stock bajo' : 'Normal' }}
+          {{ getStockStatus(item as Existencia) === 'bajo' ? 'Bajo' : 'OK' }}
         </v-chip>
       </template>
     </BaseDataTable>
   </div>
 </template>
+
+<style scoped>
+.existencias-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stat-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  background: #fff;
+}
+
+.stat-pill--warn {
+  border-color: rgba(var(--v-theme-warning), 0.35);
+  background: rgba(var(--v-theme-warning), 0.06);
+}
+
+.stat-pill__value {
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: rgb(var(--v-theme-on-surface));
+}
+
+.stat-pill--warn .stat-pill__value {
+  color: rgb(var(--v-theme-warning));
+}
+
+.stat-pill__label {
+  font-size: var(--mac-text-xs);
+  color: rgba(var(--v-theme-on-surface), 0.55);
+}
+
+.filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.filters-bar__field {
+  min-width: 160px;
+  max-width: 200px;
+}
+
+.cell-ellipsis {
+  display: block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-ellipsis--wide {
+  max-width: 180px;
+}
+
+.qty-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 48px;
+}
+
+.qty-cell__value {
+  font-variant-numeric: tabular-nums;
+}
+
+.qty-cell__bar {
+  width: 48px;
+  opacity: 0.85;
+}
+
+@media (max-width: 600px) {
+  .filters-bar__field {
+    min-width: 100%;
+    max-width: 100%;
+  }
+
+  .cell-ellipsis,
+  .cell-ellipsis--wide {
+    max-width: 100px;
+  }
+}
+</style>

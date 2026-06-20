@@ -4,6 +4,7 @@ import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import { es } from 'vuetify/locale'
+import { SUPERMARKET_COLORS } from '@/config/brand'
 
 export default createVuetify({
   components,
@@ -18,16 +19,16 @@ export default createVuetify({
       light: {
         dark: false,
         colors: {
-          primary: '#2563EB',
-          secondary: '#64748B',
-          accent: '#38BDF8',
+          primary: SUPERMARKET_COLORS.primary,
+          secondary: SUPERMARKET_COLORS.secondary,
+          accent: SUPERMARKET_COLORS.accent,
           error: '#EF4444',
-          info: '#0EA5E9',
+          info: '#0284C7',
           success: '#22C55E',
           warning: '#F59E0B',
-          background: '#F1F5F9',
+          background: SUPERMARKET_COLORS.background,
           surface: '#FFFFFF',
-          'surface-variant': '#F8FAFC',
+          'surface-variant': SUPERMARKET_COLORS.backgroundAlt,
           'on-surface-variant': '#475569',
         },
       },
@@ -35,30 +36,45 @@ export default createVuetify({
   },
   defaults: {
     VBtn: {
-      rounded: 'lg',
+      rounded: 'md',
       elevation: 0,
     },
     VCard: {
-      rounded: 'xl',
+      rounded: 'lg',
       elevation: 0,
     },
     VTextField: {
       variant: 'outlined',
-      density: 'comfortable',
+      density: 'compact',
       color: 'primary',
+      hideDetails: 'auto',
     },
     VSelect: {
       variant: 'outlined',
-      density: 'comfortable',
+      density: 'compact',
       color: 'primary',
+      hideDetails: 'auto',
     },
     VTextarea: {
       variant: 'outlined',
-      density: 'comfortable',
+      density: 'compact',
       color: 'primary',
+      hideDetails: 'auto',
     },
     VChip: {
-      rounded: 'lg',
+      rounded: 'md',
+      size: 'small',
+    },
+    VDataTable: {
+      density: 'compact',
+      hover: true,
+    },
+    VList: {
+      density: 'compact',
+    },
+    VListItem: {
+      density: 'compact',
+      rounded: 'md',
     },
   },
 })
