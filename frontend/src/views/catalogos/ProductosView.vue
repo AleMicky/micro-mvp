@@ -39,6 +39,9 @@ const historialPrecios = ref<PrecioProducto[]>([])
 const nuevoPrecio = ref<number | null>(null)
 const imagenInputRef = ref<HTMLInputElement | null>(null)
 const imagenTarget = ref<Producto | null>(null)
+const formImagenInputRef = ref<HTMLInputElement | null>(null)
+const formImagenFile = ref<File | null>(null)
+const formImagenPreview = ref<string | null>(null)
 const savingCategoria = ref(false)
 const savingProducto = ref(false)
 const deletingCategoria = ref(false)
@@ -314,6 +317,12 @@ async function confirmDeleteCategoria() {
   }
 }
 
+function resetFormImagen() {
+  if (formImagenPreview.value) URL.revokeObjectURL(formImagenPreview.value)
+  formImagenFile.value = null
+  formImagenPreview.value = null
+}
+
 function openCreateProducto() {
   if (!selectedCategoriaId.value) return
   editingProductoId.value = null
@@ -321,6 +330,7 @@ function openCreateProducto() {
     ...defaultProductoForm(),
     categoria_id: selectedCategoriaId.value,
   })
+  resetFormImagen()
   productoDialog.value = true
 }
 
@@ -337,7 +347,37 @@ function openEditProducto(item: Producto) {
     precio_venta: null,
     activo: item.activo,
   })
+  resetFormImagen()
   productoDialog.value = true
+}
+
+function triggerFormImagenUpload() {
+  formImagenInputRef.value?.click()
+}
+
+function onFormImagenSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  const allowed = ['image/jpeg', 'image/png', 'image/webp']
+  if (!allowed.includes(file.type)) {
+    appStore.showError('Formato no permitido. Use JPG, PNG o WEBP')
+    return
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    appStore.showError('La imagen no debe superar 2MB')
+    return
+  }
+
+  if (formImagenPreview.value) URL.revokeObjectURL(formImagenPreview.value)
+  formImagenFile.value = file
+  formImagenPreview.value = URL.createObjectURL(file)
+}
+
+function quitarFormImagen() {
+  resetFormImagen()
 }
 
 function openDeleteProducto(item: Producto) {
@@ -368,14 +408,25 @@ async function saveProducto() {
           ? { precio_venta: productoForm.precio_venta }
           : {}),
     }
-    if (editingProductoId.value) {
-      await catalogosService.updateProducto(editingProductoId.value, payload)
-      appStore.showSuccess('Producto actualizado')
+    let productoId = editingProductoId.value
+    if (productoId) {
+      await catalogosService.updateProducto(productoId, payload)
     } else {
-      await catalogosService.createProducto(payload)
-      appStore.showSuccess('Producto creado')
+      const { data } = await catalogosService.createProducto(payload)
+      productoId = data.id
     }
+
+    if (formImagenFile.value && productoId) {
+      try {
+        await catalogosService.uploadProductoImagen(productoId, formImagenFile.value)
+      } catch (e) {
+        appStore.showError(`Producto guardado, pero la imagen no se pudo subir: ${getErrorMessage(e)}`)
+      }
+    }
+
+    appStore.showSuccess(editingProductoId.value ? 'Producto actualizado' : 'Producto creado')
     productoDialog.value = false
+    resetFormImagen()
     await loadProductos()
   } catch (e) {
     appStore.showError(getErrorMessage(e))
@@ -480,6 +531,10 @@ watch(selectedCategoriaId, (newId, oldId) => {
   setTimeout(() => {
     isDetailTransition.value = false
   }, 200)
+})
+
+watch(productoDialog, (isOpen) => {
+  if (!isOpen) resetFormImagen()
 })
 
 onMounted(async () => {
@@ -911,7 +966,6 @@ onMounted(async () => {
       </v-row>
     </v-card>
 
-    <!-- Diálogo categoría -->
     <v-dialog v-model="categoriaDialog" max-width="560" persistent>
       <v-card>
         <v-card-title class="pa-5 pb-2">
@@ -943,7 +997,6 @@ onMounted(async () => {
       </v-card>
     </v-dialog>
 
-    <!-- Diálogo producto -->
     <v-dialog v-model="productoDialog" max-width="720" persistent scrollable>
       <v-card class="form-dialog">
         <div class="form-dialog__header form-dialog__header--product">
@@ -970,6 +1023,54 @@ onMounted(async () => {
 
         <v-card-text class="pa-5">
           <v-form ref="productoFormRef">
+            <section class="form-section">
+              <div class="form-section__title">
+                <v-icon icon="mdi-image-outline" size="18" class="mr-2" />
+                Imagen del producto
+              </div>
+              <div class="imagen-panel">
+                <div class="imagen-panel__preview">
+                  <v-img
+                    v-if="formImagenPreview || (editingProductoId && editingProductoItem?.imagen_url)"
+                    :src="formImagenPreview ?? productoImageUrl(editingProductoItem?.imagen_url)!"
+                    cover
+                  />
+                  <v-icon v-else icon="mdi-image-off-outline" size="32" color="grey-lighten-1" />
+                </div>
+                <div class="imagen-panel__actions">
+                  <v-btn
+                    size="small"
+                    variant="outlined"
+                    prepend-icon="mdi-upload"
+                    @click="triggerFormImagenUpload"
+                  >
+                    {{ formImagenPreview ? 'Cambiar imagen' : 'Seleccionar imagen' }}
+                  </v-btn>
+                  <v-btn
+                    v-if="formImagenPreview"
+                    size="small"
+                    variant="text"
+                    color="error"
+                    prepend-icon="mdi-close"
+                    @click="quitarFormImagen"
+                  >
+                    Quitar
+                  </v-btn>
+                  <div class="text-caption text-medium-emphasis mt-1">
+                    JPG, PNG o WEBP. Máx. 2MB.
+                    <template v-if="!editingProductoId">Se subirá al crear el producto.</template>
+                  </div>
+                </div>
+                <input
+                  ref="formImagenInputRef"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  class="d-none"
+                  @change="onFormImagenSelected"
+                />
+              </div>
+            </section>
+
             <section class="form-section">
               <div class="form-section__title">
                 <v-icon icon="mdi-identifier" size="18" class="mr-2" />
@@ -1645,6 +1746,36 @@ onMounted(async () => {
   border-radius: 12px;
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   background: rgba(var(--v-theme-on-surface), 0.02);
+}
+
+.imagen-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: rgba(var(--v-theme-on-surface), 0.02);
+}
+
+.imagen-panel__preview {
+  width: 88px;
+  height: 88px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--v-theme-on-surface), 0.05);
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.imagen-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
 }
 
 .price-product-card {

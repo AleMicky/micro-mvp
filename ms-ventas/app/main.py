@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.routers import cotizaciones, facturas, health, ventas
+from app.routers import clientes, cotizaciones, facturas, health, ventas
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MS Ventas", version="0.1.0", lifespan=lifespan)
 app.include_router(health.router)
+app.include_router(clientes.router)
 app.include_router(cotizaciones.router)
 app.include_router(facturas.router)  # /ventas/facturas antes de /ventas/{id}
 app.include_router(ventas.router)
