@@ -134,6 +134,47 @@ onMounted(async () => {
       </div>
     </div>
 
+    <div class="filters-panel">
+      <div class="filters-bar">
+        <v-autocomplete
+          v-model="filterProducto"
+          :items="productos"
+          item-title="nombre"
+          item-value="id"
+          label="Producto"
+          clearable
+          hide-details
+          density="compact"
+          prepend-inner-icon="mdi-package-variant"
+          class="filters-bar__field filters-bar__field--producto"
+          @update:model-value="filterAlmacen = null"
+        />
+        <v-autocomplete
+          v-model="filterAlmacen"
+          :items="almacenes"
+          item-title="nombre"
+          item-value="id"
+          label="Almacén"
+          clearable
+          hide-details
+          density="compact"
+          prepend-inner-icon="mdi-warehouse"
+          class="filters-bar__field filters-bar__field--almacen"
+          @update:model-value="filterProducto = null"
+        />
+        <v-btn
+          v-if="hasFilters"
+          size="small"
+          variant="text"
+          prepend-icon="mdi-filter-off-outline"
+          class="filters-bar__clear"
+          @click="clearFilters"
+        >
+          Limpiar
+        </v-btn>
+      </div>
+    </div>
+
     <BaseDataTable
       v-model:search="search"
       :items="items as Record<string, unknown>[]"
@@ -144,46 +185,6 @@ onMounted(async () => {
       search-label="Buscar producto o almacén..."
       empty-subtitle="Registra ingresos de stock para ver existencias."
     >
-      <template #toolbar>
-        <div class="filters-bar">
-          <v-autocomplete
-            v-model="filterProducto"
-            :items="productos"
-            item-title="nombre"
-            item-value="id"
-            label="Producto"
-            clearable
-            hide-details
-            density="compact"
-            prepend-inner-icon="mdi-package-variant"
-            class="filters-bar__field"
-            @update:model-value="filterAlmacen = null"
-          />
-          <v-autocomplete
-            v-model="filterAlmacen"
-            :items="almacenes"
-            item-title="nombre"
-            item-value="id"
-            label="Almacén"
-            clearable
-            hide-details
-            density="compact"
-            prepend-inner-icon="mdi-warehouse"
-            class="filters-bar__field"
-            @update:model-value="filterProducto = null"
-          />
-          <v-btn
-            v-if="hasFilters"
-            size="x-small"
-            variant="text"
-            prepend-icon="mdi-filter-off-outline"
-            @click="clearFilters"
-          >
-            Limpiar
-          </v-btn>
-        </div>
-      </template>
-
       <template #item.producto_id="{ value }">
         <span class="cell-ellipsis cell-ellipsis--wide" :title="productoMap[value] ?? String(value)">
           {{ productoMap[value] ?? value }}
@@ -281,16 +282,41 @@ onMounted(async () => {
   color: rgba(var(--v-theme-on-surface), 0.55);
 }
 
+.filters-panel {
+  padding: 10px 12px;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  background: #fff;
+}
+
 .filters-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.filters-bar__field {
-  min-width: 160px;
-  max-width: 200px;
+.filters-bar__field--producto {
+  flex: 1 1 280px;
+  min-width: 240px;
+  max-width: 480px;
+}
+
+.filters-bar__field--almacen {
+  flex: 1 1 220px;
+  min-width: 200px;
+  max-width: 420px;
+}
+
+.filters-bar__clear {
+  flex-shrink: 0;
+}
+
+.filters-bar__field :deep(.v-autocomplete__selection-text),
+.filters-bar__field :deep(.v-field-label) {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
 }
 
 .cell-ellipsis {
@@ -323,7 +349,9 @@ onMounted(async () => {
 }
 
 @media (max-width: 600px) {
-  .filters-bar__field {
+  .filters-bar__field--producto,
+  .filters-bar__field--almacen {
+    flex: 1 1 100%;
     min-width: 100%;
     max-width: 100%;
   }
