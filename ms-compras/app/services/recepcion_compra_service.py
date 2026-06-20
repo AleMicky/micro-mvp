@@ -3,6 +3,8 @@ from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.clients.catalogos_client import catalogos_client
+from app.clients.inventario_client import inventario_client
 from app.crud.compras import crud_orden, crud_recepcion, _calc_subtotal, _next_codigo
 from app.enums.estado import EstadoOrdenCompra, EstadoRecepcionCompra
 from app.models import RecepcionCompra, RecepcionCompraDetalle
@@ -11,7 +13,6 @@ from app.schemas.compras import (
     RecepcionCompraDetalleCreate,
     RecepcionCompraUpdate,
 )
-from app.services.clients import inventario_client
 
 
 class RecepcionCompraService:
@@ -55,16 +56,31 @@ class RecepcionCompraService:
             )
         return orden
 
+    async def _aplicar_snapshot_almacen(self, recepcion: RecepcionCompra, almacen_id: int) -> None:
+        almacen = await inventario_client.obtener_almacen_por_id(almacen_id)
+        recepcion.almacen_id = almacen_id
+        recepcion.almacen_nombre = almacen.get("nombre")
+        recepcion.sucursal_id = almacen.get("sucursal_id")
+        recepcion.sucursal_nombre = almacen.get("sucursal_nombre")
+        recepcion.compania_id = almacen.get("compania_id")
+        recepcion.compania_nombre = almacen.get("compania_nombre")
+
     async def crear(self, db: AsyncSession, payload: RecepcionCompraCreate):
         await self._validar_orden_aprobada(db, payload.orden_compra_id)
+        almacen = await inventario_client.obtener_almacen_por_id(payload.almacen_id)
 
         codigo = await _next_codigo(db, "REC", RecepcionCompra)
-        total = self._calcular_total(payload.detalles)
+        total = await self._calcular_total(payload.detalles)
 
         recepcion = RecepcionCompra(
             codigo=codigo,
             orden_id=payload.orden_compra_id,
             almacen_id=payload.almacen_id,
+            almacen_nombre=almacen.get("nombre"),
+            sucursal_id=almacen.get("sucursal_id"),
+            sucursal_nombre=almacen.get("sucursal_nombre"),
+            compania_id=almacen.get("compania_id"),
+            compania_nombre=almacen.get("compania_nombre"),
             estado=EstadoRecepcionCompra.BORRADOR.value,
             fecha=payload.fecha,
             observaciones=payload.observacion,
@@ -72,7 +88,7 @@ class RecepcionCompraService:
         )
         db.add(recepcion)
         await db.flush()
-        self._agregar_detalles(db, recepcion.id, payload.detalles)
+        await self._agregar_detalles(db, recepcion.id, payload.detalles)
         await db.commit()
         return await self.obtener(db, recepcion.id)
 
@@ -81,7 +97,7 @@ class RecepcionCompraService:
         self._validar_editable(recepcion)
 
         if payload.almacen_id is not None:
-            recepcion.almacen_id = payload.almacen_id
+            await self._aplicar_snapshot_almacen(recepcion, payload.almacen_id)
         if payload.fecha is not None:
             recepcion.fecha = payload.fecha
         if payload.observacion is not None:
@@ -90,8 +106,8 @@ class RecepcionCompraService:
         if payload.detalles is not None:
             for det in list(recepcion.detalles):
                 await db.delete(det)
-            recepcion.total = self._calcular_total(payload.detalles)
-            self._agregar_detalles(db, recepcion.id, payload.detalles)
+            recepcion.total = await self._calcular_total(payload.detalles)
+            await self._agregar_detalles(db, recepcion.id, payload.detalles)
 
         await db.commit()
         return await self.obtener(db, recepcion_id)
@@ -126,7 +142,8 @@ class RecepcionCompraService:
                 producto_id=det.producto_id,
                 almacen_id=recepcion.almacen_id,
                 cantidad=det.cantidad_recibida,
-                observacion="Ingreso por recepción de compra",
+                costo_unitario=det.costo_unitario,
+                observacion=f"Ingreso por recepción {recepcion.codigo}",
                 referencia_tipo="RECEPCION_COMPRA",
                 referencia_id=recepcion.id,
                 creado_por="sistema",
@@ -154,21 +171,27 @@ class RecepcionCompraService:
         await db.commit()
         return await self.obtener(db, recepcion_id)
 
-    @staticmethod
-    def _calcular_total(detalles: list[RecepcionCompraDetalleCreate]) -> Decimal:
-        return sum(_calc_subtotal(d.cantidad_recibida, d.costo_unitario) for d in detalles)
+    async def _calcular_total(self, detalles: list[RecepcionCompraDetalleCreate]) -> Decimal:
+        total = Decimal("0")
+        for d in detalles:
+            await catalogos_client.obtener_producto_por_id(d.producto_id)
+            total += _calc_subtotal(d.cantidad_recibida, d.costo_unitario)
+        return total
 
-    @staticmethod
-    def _agregar_detalles(
+    async def _agregar_detalles(
+        self,
         db: AsyncSession,
         recepcion_id: int,
         detalles: list[RecepcionCompraDetalleCreate],
     ) -> None:
         for d in detalles:
+            producto = await catalogos_client.obtener_producto_por_id(d.producto_id)
             db.add(
                 RecepcionCompraDetalle(
                     recepcion_id=recepcion_id,
                     producto_id=d.producto_id,
+                    producto_codigo=producto.get("codigo"),
+                    producto_nombre=producto.get("nombre"),
                     cantidad_recibida=d.cantidad_recibida,
                     costo_unitario=d.costo_unitario,
                     subtotal=_calc_subtotal(d.cantidad_recibida, d.costo_unitario),

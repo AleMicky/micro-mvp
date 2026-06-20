@@ -109,6 +109,13 @@ class StockService:
         if payload.stock_maximo is not None:
             existencia.stock_maximo = payload.stock_maximo
 
+        referencia = ReferenciaTipo.INGRESO
+        if payload.referencia_tipo:
+            try:
+                referencia = ReferenciaTipo(payload.referencia_tipo)
+            except ValueError:
+                referencia = ReferenciaTipo.INGRESO
+
         movimiento = await self._registrar_movimiento(
             db,
             tipo=TipoMovimiento.INGRESO,
@@ -117,7 +124,8 @@ class StockService:
             cantidad=payload.cantidad,
             cantidad_anterior=cantidad_anterior,
             cantidad_nueva=cantidad_nueva,
-            referencia_tipo=ReferenciaTipo.INGRESO,
+            referencia_tipo=referencia,
+            referencia_id=payload.referencia_id,
             observaciones=payload.observaciones,
         )
 

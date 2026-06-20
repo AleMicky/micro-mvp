@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://compras_user:compras_secret@localhost:5435/compras_db"
     service_name: str = "ms-compras"
     run_seed: bool = False
+    ms_catalogos_url: str = "http://ms-catalogos:8001"
     ms_inventario_url: str = "http://ms-inventario:8002"
     ms_finanzas_url: str = "http://localhost:8006"
 

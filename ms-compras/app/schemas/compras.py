@@ -102,6 +102,8 @@ class OrdenCompraDetalleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     producto_id: int
+    producto_codigo: str | None = None
+    producto_nombre: str | None = None
     cantidad: Decimal
     precio_unitario: Decimal
     subtotal: Decimal
@@ -173,6 +175,8 @@ class RecepcionCompraDetalleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     producto_id: int
+    producto_codigo: str | None = None
+    producto_nombre: str | None = None
     cantidad_recibida: Decimal
     costo_unitario: Decimal
     subtotal: Decimal
@@ -221,6 +225,11 @@ class RecepcionCompraResponse(AuditoriaResponse):
     codigo: str
     orden_compra_id: int = Field(validation_alias="orden_id")
     almacen_id: int
+    almacen_nombre: str | None = None
+    sucursal_id: int | None = None
+    sucursal_nombre: str | None = None
+    compania_id: int | None = None
+    compania_nombre: str | None = None
     estado: str
     fecha: str | None = None
     observacion: str | None = Field(None, validation_alias="observaciones")

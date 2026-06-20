@@ -138,7 +138,10 @@ class CRUDRecepcion:
         stmt = (
             select(RecepcionCompra)
             .where(RecepcionCompra.id == id)
-            .options(selectinload(RecepcionCompra.detalles))
+            .options(
+                selectinload(RecepcionCompra.detalles),
+                selectinload(RecepcionCompra.orden),
+            )
         )
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
@@ -146,7 +149,10 @@ class CRUDRecepcion:
     async def get_all(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> list[RecepcionCompra]:
         stmt = (
             select(RecepcionCompra)
-            .options(selectinload(RecepcionCompra.detalles))
+            .options(
+                selectinload(RecepcionCompra.detalles),
+                selectinload(RecepcionCompra.orden),
+            )
             .offset(skip)
             .limit(limit)
             .order_by(RecepcionCompra.id.desc())

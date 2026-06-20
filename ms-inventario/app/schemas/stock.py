@@ -13,6 +13,10 @@ class StockOperacionBase(BaseModel):
 class StockIngresoRequest(StockOperacionBase):
     stock_minimo: Decimal | None = Field(None, ge=0)
     stock_maximo: Decimal | None = Field(None, ge=0)
+    costo_unitario: Decimal | None = Field(None, ge=0)
+    referencia_tipo: str | None = None
+    referencia_id: int | None = Field(None, gt=0)
+    creado_por: str | None = None
 
 
 class StockSalidaRequest(StockOperacionBase):

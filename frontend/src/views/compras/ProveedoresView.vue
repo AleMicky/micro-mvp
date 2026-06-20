@@ -25,9 +25,10 @@ const form = reactive(defaultForm())
 
 const headers = [
   { title: 'Código', key: 'codigo' },
-  { title: 'Nombre', key: 'nombre' },
-  { title: 'RFC', key: 'rfc' },
-  { title: 'Email', key: 'email' },
+  { title: 'Razón Social', key: 'nombre' },
+  { title: 'NIT', key: 'rfc' },
+  { title: 'Teléfono', key: 'telefono' },
+  { title: 'Correo', key: 'email' },
   { title: 'Estado', key: 'activo' },
   { title: 'Acciones', key: 'actions', sortable: false, align: 'end' as const, width: 120 },
 ]
@@ -70,7 +71,7 @@ async function confirmDelete() {
   deleting.value = true
   try {
     await comprasService.deleteProveedor(deleteTarget.value.id)
-    appStore.showSuccess('Proveedor eliminado')
+    appStore.showSuccess('Proveedor desactivado')
     confirmOpen.value = false
     deleteTarget.value = null
     await loadData()
@@ -95,9 +96,9 @@ onMounted(loadData)
       <v-card-text class="pa-5"><v-form ref="formRef">
         <v-row>
           <v-col cols="12" md="6"><v-text-field v-model="form.codigo" label="Código" :rules="[requiredRule]" /></v-col>
-          <v-col cols="12" md="6"><v-text-field v-model="form.nombre" label="Nombre" :rules="[requiredRule]" /></v-col>
-          <v-col cols="12" md="6"><v-text-field v-model="form.rfc" label="RFC" /></v-col>
-          <v-col cols="12" md="6"><v-text-field v-model="form.email" label="Email" /></v-col>
+          <v-col cols="12" md="6"><v-text-field v-model="form.nombre" label="Razón Social" :rules="[requiredRule]" /></v-col>
+          <v-col cols="12" md="6"><v-text-field v-model="form.rfc" label="NIT" /></v-col>
+          <v-col cols="12" md="6"><v-text-field v-model="form.email" label="Correo" /></v-col>
           <v-col cols="12" md="6"><v-text-field v-model="form.telefono" label="Teléfono" /></v-col>
           <v-col cols="12"><v-textarea v-model="form.direccion" label="Dirección" rows="2" /></v-col>
           <v-col cols="12"><v-switch v-model="form.activo" label="Activo" color="success" hide-details inset /></v-col>
@@ -106,5 +107,5 @@ onMounted(loadData)
       <v-card-actions class="pa-5"><v-spacer /><v-btn variant="text" @click="dialog = false">Cancelar</v-btn><v-btn color="primary" :loading="saving" @click="saveItem">Guardar</v-btn></v-card-actions>
     </v-card>
   </v-dialog>
-  <ConfirmDialog v-model="confirmOpen" :loading="deleting" :message="`¿Eliminar proveedor «${deleteTarget?.nombre}»?`" @confirm="confirmDelete" />
+  <ConfirmDialog v-model="confirmOpen" :loading="deleting" :message="`¿Desactivar proveedor «${deleteTarget?.nombre}»?`" @confirm="confirmDelete" />
 </template>

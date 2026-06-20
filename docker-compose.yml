@@ -343,6 +343,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_COMPRAS_USER}:${POSTGRES_COMPRAS_PASSWORD}@postgres-compras:5432/${POSTGRES_COMPRAS_DB}
       SERVICE_NAME: ms-compras
       RUN_SEED: "true"
+      MS_CATALOGOS_URL: http://ms-catalogos:8001
       MS_INVENTARIO_URL: http://ms-inventario:8002
       MS_FINANZAS_URL: http://ms-finanzas:8006
     ports:

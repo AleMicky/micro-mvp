@@ -1,11 +1,13 @@
 from decimal import Decimal
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.clients.catalogos_client import catalogos_client
 from app.crud.compras import crud_orden, _calc_subtotal, _next_codigo
-from app.enums.estado import EstadoOrdenCompra
-from app.models import OrdenCompra, OrdenCompraDetalle
+from app.enums.estado import EstadoOrdenCompra, EstadoRecepcionCompra
+from app.models import OrdenCompra, OrdenCompraDetalle, RecepcionCompra
 from app.schemas.compras import OrdenCompraCreate, OrdenCompraDetalleCreate, OrdenCompraUpdate
 from app.services.proveedor_service import proveedor_service
 
@@ -34,11 +36,18 @@ class OrdenCompraService:
                 detail="No se puede eliminar una orden aprobada",
             )
 
+    async def _tiene_recepciones_confirmadas(self, db: AsyncSession, orden_id: int) -> bool:
+        stmt = select(RecepcionCompra.id).where(
+            RecepcionCompra.orden_id == orden_id,
+            RecepcionCompra.estado == EstadoRecepcionCompra.CONFIRMADA.value,
+        )
+        return (await db.execute(stmt)).scalar_one_or_none() is not None
+
     async def crear(self, db: AsyncSession, payload: OrdenCompraCreate):
         await proveedor_service.validar_activo(db, payload.proveedor_id)
 
         codigo = await _next_codigo(db, "OC", OrdenCompra)
-        total = self._calcular_total(payload.detalles)
+        total = await self._calcular_total(payload.detalles)
 
         orden = OrdenCompra(
             codigo=codigo,
@@ -51,7 +60,7 @@ class OrdenCompraService:
         )
         db.add(orden)
         await db.flush()
-        self._agregar_detalles(db, orden.id, payload.detalles)
+        await self._agregar_detalles(db, orden.id, payload.detalles)
         await db.commit()
         return await self.obtener(db, orden.id)
 
@@ -73,8 +82,8 @@ class OrdenCompraService:
         if payload.detalles is not None:
             for det in list(orden.detalles):
                 await db.delete(det)
-            orden.total = self._calcular_total(payload.detalles)
-            self._agregar_detalles(db, orden.id, payload.detalles)
+            orden.total = await self._calcular_total(payload.detalles)
+            await self._agregar_detalles(db, orden.id, payload.detalles)
 
         await db.commit()
         return await self.obtener(db, orden_id)
@@ -116,31 +125,37 @@ class OrdenCompraService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="La orden ya está cancelada",
             )
-        if orden.estado == EstadoOrdenCompra.APROBADA.value:
+        if await self._tiene_recepciones_confirmadas(db, orden_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No se puede cancelar una orden aprobada",
+                detail="No se puede cancelar una orden con recepciones confirmadas",
             )
 
         orden.estado = EstadoOrdenCompra.CANCELADA.value
         await db.commit()
         return await self.obtener(db, orden_id)
 
-    @staticmethod
-    def _calcular_total(detalles: list[OrdenCompraDetalleCreate]) -> Decimal:
-        return sum(_calc_subtotal(d.cantidad, d.precio_unitario) for d in detalles)
+    async def _calcular_total(self, detalles: list[OrdenCompraDetalleCreate]) -> Decimal:
+        total = Decimal("0")
+        for d in detalles:
+            await catalogos_client.obtener_producto_por_id(d.producto_id)
+            total += _calc_subtotal(d.cantidad, d.precio_unitario)
+        return total
 
-    @staticmethod
-    def _agregar_detalles(
+    async def _agregar_detalles(
+        self,
         db: AsyncSession,
         orden_id: int,
         detalles: list[OrdenCompraDetalleCreate],
     ) -> None:
         for d in detalles:
+            producto = await catalogos_client.obtener_producto_por_id(d.producto_id)
             db.add(
                 OrdenCompraDetalle(
                     orden_id=orden_id,
                     producto_id=d.producto_id,
+                    producto_codigo=producto.get("codigo"),
+                    producto_nombre=producto.get("nombre"),
                     cantidad=d.cantidad,
                     precio_unitario=d.precio_unitario,
                     subtotal=_calc_subtotal(d.cantidad, d.precio_unitario),

@@ -19,7 +19,27 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 PROVEEDORES = [
-    {"codigo": "PROV-001", "nombre": "Distribuidora Bolivia S.R.L.", "email": "ventas@bolivia.com"},
+    {
+        "codigo": "PROV-001",
+        "nombre": "PIL Bolivia S.A.",
+        "rfc": "1001001001",
+        "telefono": "70000001",
+        "email": "ventas@pil.bo",
+    },
+    {
+        "codigo": "PROV-002",
+        "nombre": "Distribuidora Andina S.R.L.",
+        "rfc": "1001001002",
+        "telefono": "70000002",
+        "email": "contacto@andina.bo",
+    },
+    {
+        "codigo": "PROV-003",
+        "nombre": "Importadora Santa Cruz Ltda.",
+        "rfc": "1001001003",
+        "telefono": "70000003",
+        "email": "ventas@importsantacruz.bo",
+    },
 ]
 
 
@@ -27,7 +47,9 @@ async def run_seed() -> None:
     async with async_session() as db:
         proveedores: dict[str, Proveedor] = {}
         for data in PROVEEDORES:
-            stmt = select(Proveedor).where(Proveedor.codigo == data["codigo"])
+            stmt = select(Proveedor).where(
+                (Proveedor.codigo == data["codigo"]) | (Proveedor.rfc == data["rfc"])
+            )
             prov = (await db.execute(stmt)).scalar_one_or_none()
             if not prov:
                 prov = Proveedor(**data)
@@ -46,7 +68,7 @@ async def run_seed() -> None:
                 proveedor_id=proveedor.id,
                 estado=EstadoOrdenCompra.APROBADA.value,
                 fecha="2026-06-01",
-                total=Decimal("925.00"),
+                total=Decimal("1500.00"),
                 observaciones="Orden demo leche PIL",
             )
             db.add(orden)
@@ -55,13 +77,15 @@ async def run_seed() -> None:
                 OrdenCompraDetalle(
                     orden_id=orden.id,
                     producto_id=1,
-                    cantidad=Decimal("50"),
-                    precio_unitario=Decimal("18.50"),
-                    subtotal=Decimal("925.00"),
+                    producto_codigo="PROD-001",
+                    producto_nombre="Leche PIL 980cc",
+                    cantidad=Decimal("100"),
+                    precio_unitario=Decimal("15.00"),
+                    subtotal=Decimal("1500.00"),
                 )
             )
             await db.commit()
-            logger.info("Orden de compra demo creada")
+            logger.info("Orden de compra demo creada: OC-00001")
 
         stmt = select(RecepcionCompra).where(RecepcionCompra.codigo == "REC-00001")
         if not (await db.execute(stmt)).scalar_one_or_none():
@@ -71,10 +95,15 @@ async def run_seed() -> None:
                 codigo="REC-00001",
                 orden_id=orden.id,
                 almacen_id=1,
+                almacen_nombre="Almacén General Central",
+                sucursal_id=1,
+                sucursal_nombre="Sucursal Central",
+                compania_id=1,
+                compania_nombre="Empresa Demo",
                 estado=EstadoRecepcionCompra.BORRADOR.value,
                 fecha="2026-06-10",
-                total=Decimal("925.00"),
-                observaciones="Recepción demo orden 1",
+                total=Decimal("1500.00"),
+                observaciones="Recepción demo OC-00001",
             )
             db.add(recepcion)
             await db.flush()
@@ -82,13 +111,15 @@ async def run_seed() -> None:
                 RecepcionCompraDetalle(
                     recepcion_id=recepcion.id,
                     producto_id=1,
-                    cantidad_recibida=Decimal("50"),
-                    costo_unitario=Decimal("18.50"),
-                    subtotal=Decimal("925.00"),
+                    producto_codigo="PROD-001",
+                    producto_nombre="Leche PIL 980cc",
+                    cantidad_recibida=Decimal("100"),
+                    costo_unitario=Decimal("15.00"),
+                    subtotal=Decimal("1500.00"),
                 )
             )
             await db.commit()
-            logger.info("Recepción demo creada")
+            logger.info("Recepción demo creada: REC-00001")
 
     logger.info("Seed ms-compras completado")
 

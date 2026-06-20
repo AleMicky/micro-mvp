@@ -53,8 +53,8 @@ const menuSections: MenuSection[] = [
         title: 'Compras',
         icon: 'mdi-cart-arrow-down',
         children: [
-          { title: 'Cotizaciones', icon: 'mdi-file-document-edit-outline', to: '/compras/cotizaciones' },
-          { title: 'Órdenes', icon: 'mdi-clipboard-list-outline', to: '/compras/ordenes' },
+          { title: 'Proveedores', icon: 'mdi-truck-outline', to: '/compras/proveedores' },
+          { title: 'Órdenes de Compra', icon: 'mdi-clipboard-list-outline', to: '/compras/ordenes' },
           { title: 'Recepciones', icon: 'mdi-package-down', to: '/compras/recepciones' },
         ],
       },
@@ -112,7 +112,6 @@ const menuSections: MenuSection[] = [
           { title: 'Puntos', icon: 'mdi-star-outline', to: '/clientes/puntos' },
         ],
       },
-      { title: 'Proveedores', icon: 'mdi-truck-outline', to: '/compras/proveedores' },
       { title: 'Empresas', icon: 'mdi-domain', to: '/company/empresas' },
     ],
   },
