@@ -17,9 +17,6 @@ logger = logging.getLogger(__name__)
 
 CIUDADES_SEED = [
     {"nombre": "Cochabamba", "departamento": "Cochabamba"},
-    {"nombre": "La Paz", "departamento": "La Paz"},
-    {"nombre": "Santa Cruz", "departamento": "Santa Cruz"},
-    {"nombre": "Oruro", "departamento": "Oruro"},
 ]
 
 COMPANIAS_SEED = [
@@ -29,27 +26,6 @@ COMPANIAS_SEED = [
         "nit": "102030405",
         "direccion": "Av. Heroínas 1200, Cochabamba",
         "telefono": "44221100",
-    },
-    {
-        "codigo": "OXXO-BOL",
-        "nombre": "OXXO Bolivia",
-        "nit": "203040506",
-        "direccion": "Av. Arce 2500, La Paz",
-        "telefono": "22113344",
-    },
-    {
-        "codigo": "HIPERMAXI-BOL",
-        "nombre": "Hipermaxi",
-        "nit": "304050607",
-        "direccion": "Av. Cristo Redentor 8vo anillo, Santa Cruz",
-        "telefono": "33445566",
-    },
-    {
-        "codigo": "IC-NORTE-BOL",
-        "nombre": "IC Norte",
-        "nit": "405060708",
-        "direccion": "Av. Banzer km 4, Santa Cruz",
-        "telefono": "35667788",
     },
 ]
 
@@ -67,34 +43,6 @@ SUCURSALES_SEED = [
         "compania_codigo": "SM-BOL",
         "ciudad_nombre": "Cochabamba",
         "direccion": "Av. América 3200, Cochabamba",
-    },
-    {
-        "codigo": "SUC-PRADO",
-        "nombre": "Sucursal Prado",
-        "compania_codigo": "OXXO-BOL",
-        "ciudad_nombre": "La Paz",
-        "direccion": "Av. 16 de Julio, El Prado, La Paz",
-    },
-    {
-        "codigo": "SUC-ALTO",
-        "nombre": "Sucursal El Alto",
-        "compania_codigo": "OXXO-BOL",
-        "ciudad_nombre": "La Paz",
-        "direccion": "Av. Juan Pablo II, El Alto",
-    },
-    {
-        "codigo": "SUC-HIPER-1",
-        "nombre": "Sucursal 1",
-        "compania_codigo": "HIPERMAXI-BOL",
-        "ciudad_nombre": "Santa Cruz",
-        "direccion": "Av. Cristo Redentor, Santa Cruz",
-    },
-    {
-        "codigo": "SUC-MELCHOR",
-        "nombre": "Melchor Pérez",
-        "compania_codigo": "IC-NORTE-BOL",
-        "ciudad_nombre": "Santa Cruz",
-        "direccion": "Av. Melchor Pérez de Olguín, Santa Cruz",
     },
 ]
 

@@ -133,32 +133,11 @@ USUARIOS_SEED = [
         "rol_codigo": "ADMIN",
     },
     {
-        "nombre_completo": "Gerente General",
-        "nombre_usuario": "gerente",
-        "correo": "gerente@supermarket.bo",
-        "password": "Gerente123456",
-        "rol_codigo": "GERENTE",
-    },
-    {
         "nombre_completo": "Cajero Principal",
         "nombre_usuario": "cajero",
         "correo": "cajero@supermarket.bo",
         "password": "Cajero123456",
         "rol_codigo": "CAJERO",
-    },
-    {
-        "nombre_completo": "Responsable de Almacén",
-        "nombre_usuario": "almacenero",
-        "correo": "almacen@supermarket.bo",
-        "password": "Almacen123456",
-        "rol_codigo": "ALMACENERO",
-    },
-    {
-        "nombre_completo": "Supervisor de Sucursal",
-        "nombre_usuario": "supervisor",
-        "correo": "supervisor@supermarket.bo",
-        "password": "Supervisor123456",
-        "rol_codigo": "SUPERVISOR",
     },
 ]
 

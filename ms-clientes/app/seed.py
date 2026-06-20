@@ -24,22 +24,6 @@ CLIENTES_SEED = [
         "telefono": "70000001",
         "puntos": 0,
     },
-    {
-        "codigo": "CLI-002",
-        "nombre": "María López",
-        "documento": "2345678",
-        "email": "maria.lopez@test.com",
-        "telefono": "70000002",
-        "puntos": 0,
-    },
-    {
-        "codigo": "CLI-003",
-        "nombre": "Carlos Rojas",
-        "documento": "3456789",
-        "email": "carlos.rojas@test.com",
-        "telefono": "70000003",
-        "puntos": 0,
-    },
 ]
 
 

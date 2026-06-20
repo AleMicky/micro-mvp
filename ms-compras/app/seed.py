@@ -20,8 +20,6 @@ logger = logging.getLogger(__name__)
 
 PROVEEDORES = [
     {"codigo": "PROV-001", "nombre": "Distribuidora Bolivia S.R.L.", "email": "ventas@bolivia.com"},
-    {"codigo": "PROV-002", "nombre": "Importadora Andina S.A.", "email": "contacto@andina.com"},
-    {"codigo": "PROV-003", "nombre": "Proveedor Local Cochabamba", "email": "info@cochabamba.com"},
 ]
 
 
@@ -42,55 +40,34 @@ async def run_seed() -> None:
 
         stmt = select(OrdenCompra).where(OrdenCompra.codigo == "OC-00001")
         if not (await db.execute(stmt)).scalar_one_or_none():
-            p1 = proveedores["PROV-001"]
-            orden1 = OrdenCompra(
+            proveedor = proveedores["PROV-001"]
+            orden = OrdenCompra(
                 codigo="OC-00001",
-                proveedor_id=p1.id,
+                proveedor_id=proveedor.id,
                 estado=EstadoOrdenCompra.APROBADA.value,
                 fecha="2026-06-01",
                 total=Decimal("925.00"),
-                observaciones="Orden demo producto 1",
+                observaciones="Orden demo leche PIL",
             )
-            db.add(orden1)
+            db.add(orden)
             await db.flush()
             db.add(
                 OrdenCompraDetalle(
-                    orden_id=orden1.id,
+                    orden_id=orden.id,
                     producto_id=1,
                     cantidad=Decimal("50"),
                     precio_unitario=Decimal("18.50"),
                     subtotal=Decimal("925.00"),
                 )
             )
-
-            p2 = proveedores["PROV-002"]
-            orden2 = OrdenCompra(
-                codigo="OC-00002",
-                proveedor_id=p2.id,
-                estado=EstadoOrdenCompra.BORRADOR.value,
-                fecha="2026-06-05",
-                total=Decimal("360.00"),
-                observaciones="Orden demo producto 2",
-            )
-            db.add(orden2)
-            await db.flush()
-            db.add(
-                OrdenCompraDetalle(
-                    orden_id=orden2.id,
-                    producto_id=2,
-                    cantidad=Decimal("30"),
-                    precio_unitario=Decimal("12.00"),
-                    subtotal=Decimal("360.00"),
-                )
-            )
             await db.commit()
-            logger.info("Órdenes de compra demo creadas")
+            logger.info("Orden de compra demo creada")
 
         stmt = select(RecepcionCompra).where(RecepcionCompra.codigo == "REC-00001")
         if not (await db.execute(stmt)).scalar_one_or_none():
             stmt_o = select(OrdenCompra).where(OrdenCompra.codigo == "OC-00001")
             orden = (await db.execute(stmt_o)).scalar_one()
-            rec1 = RecepcionCompra(
+            recepcion = RecepcionCompra(
                 codigo="REC-00001",
                 orden_id=orden.id,
                 almacen_id=1,
@@ -99,11 +76,11 @@ async def run_seed() -> None:
                 total=Decimal("925.00"),
                 observaciones="Recepción demo orden 1",
             )
-            db.add(rec1)
+            db.add(recepcion)
             await db.flush()
             db.add(
                 RecepcionCompraDetalle(
-                    recepcion_id=rec1.id,
+                    recepcion_id=recepcion.id,
                     producto_id=1,
                     cantidad_recibida=Decimal("50"),
                     costo_unitario=Decimal("18.50"),

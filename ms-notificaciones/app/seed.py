@@ -15,31 +15,12 @@ from app.models.notificacion import Notificacion
 
 logger = logging.getLogger(__name__)
 
-# cliente_id=1 corresponde a Juanito Pérez en ms-clientes.
 NOTIFICACIONES_SEED = [
     {
         "evento_origen": "SEED-SaleCompleted",
         "tipo": "VENTA",
         "contenido": "Venta completada para Juanito Pérez.",
         "cliente_id": 1,
-    },
-    {
-        "evento_origen": "SEED-PointsAssigned",
-        "tipo": "PUNTOS",
-        "contenido": "Puntos asignados a Juanito Pérez.",
-        "cliente_id": 1,
-    },
-    {
-        "evento_origen": "SEED-TransferCompleted",
-        "tipo": "TRANSFERENCIA",
-        "contenido": "Transferencia completada entre Sucursal Prado y Sucursal El Alto.",
-        "cliente_id": None,
-    },
-    {
-        "evento_origen": "SEED-StockLow",
-        "tipo": "STOCK",
-        "contenido": "Stock bajo de producto Leche PIL 980cc en Sucursal Prado.",
-        "cliente_id": None,
     },
 ]
 

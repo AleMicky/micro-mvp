@@ -26,34 +26,21 @@ from app.schemas.unidad_medida import UnidadMedidaCreate
 logger = logging.getLogger(__name__)
 
 CATEGORIAS_SEED = [
-    {"codigo": "CAT-LACTEOS", "nombre": "Lácteos", "descripcion": "Leche, queso y derivados lácteos"},
-    {"codigo": "CAT-GRANOS", "nombre": "Granos", "descripcion": "Arroz, quinua y cereales"},
-    {"codigo": "CAT-ACEITES", "nombre": "Aceites", "descripcion": "Aceites comestibles"},
-    {"codigo": "CAT-ENDULZANTES", "nombre": "Endulzantes", "descripcion": "Azúcar, miel y edulcorantes"},
-    {"codigo": "CAT-CONSERVAS", "nombre": "Conservas", "descripcion": "Salsas, mayonesa y enlatados"},
-    {"codigo": "CAT-LIMPIEZA", "nombre": "Limpieza", "descripcion": "Productos de limpieza del hogar"},
-    {"codigo": "CAT-BEBIDAS", "nombre": "Bebidas", "descripcion": "Gaseosas, jugos y bebidas"},
-    {"codigo": "CAT-PANADERIA", "nombre": "Panadería", "descripcion": "Pan, galletas y repostería"},
+    {"codigo": "CAT-LACTEOS", "nombre": "Lácteos", "descripcion": "Leche y derivados lácteos"},
+    {"codigo": "CAT-GRANOS", "nombre": "Granos", "descripcion": "Arroz y cereales"},
+    {"codigo": "CAT-BEBIDAS", "nombre": "Bebidas", "descripcion": "Gaseosas y bebidas"},
 ]
 
 MARCAS_SEED = [
     {"codigo": "MAR-PIL", "nombre": "PIL", "descripcion": "Lácteos PIL"},
     {"codigo": "MAR-GRANO-ORO", "nombre": "Grano de Oro", "descripcion": "Arroz y granos"},
-    {"codigo": "MAR-FINO", "nombre": "Fino", "descripcion": "Aceites Fino"},
-    {"codigo": "MAR-GUABIRA", "nombre": "Guabirá", "descripcion": "Azúcar Guabirá"},
-    {"codigo": "MAR-CRIS", "nombre": "Cris", "descripcion": "Salsas y mayonesa Cris"},
     {"codigo": "MAR-COCA-COLA", "nombre": "Coca-Cola", "descripcion": "Bebidas Coca-Cola"},
-    {"codigo": "MAR-OMO", "nombre": "OMO", "descripcion": "Detergentes OMO"},
-    {"codigo": "MAR-PRINCESA", "nombre": "Princesa", "descripcion": "Panadería Princesa"},
 ]
 
 UNIDADES_SEED = [
     {"codigo": "UND", "nombre": "Unidad", "abreviatura": "UND"},
     {"codigo": "BOL", "nombre": "Bolsa", "abreviatura": "BOL"},
-    {"codigo": "LT", "nombre": "Litro", "abreviatura": "LT"},
     {"codigo": "KG", "nombre": "Kilogramo", "abreviatura": "KG"},
-    {"codigo": "CJ", "nombre": "Caja", "abreviatura": "CJ"},
-    {"codigo": "PQT", "nombre": "Paquete", "abreviatura": "PQT"},
 ]
 
 PRODUCTOS_SEED = [
@@ -80,36 +67,6 @@ PRODUCTOS_SEED = [
     {
         "codigo": "PROD-003",
         "codigo_barras": "777100100003",
-        "nombre": "Aceite Fino 1L",
-        "descripcion": "Aceite vegetal comestible botella 1 litro",
-        "categoria_codigo": "CAT-ACEITES",
-        "marca_codigo": "MAR-FINO",
-        "unidad_codigo": "LT",
-        "precio_venta": Decimal("16.50"),
-    },
-    {
-        "codigo": "PROD-004",
-        "codigo_barras": "777100100004",
-        "nombre": "Azúcar Guabirá 1kg",
-        "descripcion": "Azúcar blanca refinada bolsa 1kg",
-        "categoria_codigo": "CAT-ENDULZANTES",
-        "marca_codigo": "MAR-GUABIRA",
-        "unidad_codigo": "KG",
-        "precio_venta": Decimal("10.00"),
-    },
-    {
-        "codigo": "PROD-005",
-        "codigo_barras": "777100100005",
-        "nombre": "Mayonesa Cris 120g",
-        "descripcion": "Mayonesa tradicional frasco 120g",
-        "categoria_codigo": "CAT-CONSERVAS",
-        "marca_codigo": "MAR-CRIS",
-        "unidad_codigo": "UND",
-        "precio_venta": Decimal("2.00"),
-    },
-    {
-        "codigo": "PROD-006",
-        "codigo_barras": "777100100006",
         "nombre": "Coca-Cola 2L",
         "descripcion": "Bebida gaseosa sabor cola botella 2 litros",
         "categoria_codigo": "CAT-BEBIDAS",

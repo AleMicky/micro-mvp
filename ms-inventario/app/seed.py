@@ -29,24 +29,9 @@ PRODUCTO_ID_BY_CODIGO = {
     "PROD-001": 1,
     "PROD-002": 2,
     "PROD-003": 3,
-    "PROD-004": 4,
-    "PROD-005": 5,
-    "PROD-006": 6,
 }
 
 ALMACENES_SEED = [
-    {
-        "codigo": "ALM-PRADO-GEN",
-        "nombre": "Almacén General Prado",
-        "direccion": "Almacén principal de Sucursal Prado",
-        "sucursal_codigo": "SUC-PRADO",
-    },
-    {
-        "codigo": "ALM-ELALTO-GEN",
-        "nombre": "Almacén General El Alto",
-        "direccion": "Almacén principal de Sucursal El Alto",
-        "sucursal_codigo": "SUC-ALTO",
-    },
     {
         "codigo": "ALM-CENTRAL-GEN",
         "nombre": "Almacén General Central",
@@ -59,33 +44,12 @@ ALMACENES_SEED = [
         "direccion": "Almacén principal de Sucursal Zona Norte",
         "sucursal_codigo": "SUC-NORTE",
     },
-    {
-        "codigo": "ALM-HIPER-1",
-        "nombre": "Almacén Hipermaxi Sucursal 1",
-        "direccion": "Hipermaxi - Sucursal 1",
-        "sucursal_codigo": "SUC-HIPER-1",
-    },
-    {
-        "codigo": "ALM-MELCHOR",
-        "nombre": "Almacén Melchor Pérez",
-        "direccion": "IC Norte - Melchor Pérez",
-        "sucursal_codigo": "SUC-MELCHOR",
-    },
 ]
 
 EXISTENCIAS_SEED = [
-    {"producto_codigo": "PROD-001", "almacen_codigo": "ALM-HIPER-1", "cantidad_actual": Decimal("18")},
-    {"producto_codigo": "PROD-001", "almacen_codigo": "ALM-MELCHOR", "cantidad_actual": Decimal("85")},
-    {"producto_codigo": "PROD-001", "almacen_codigo": "ALM-PRADO-GEN", "cantidad_actual": Decimal("48")},
-    {"producto_codigo": "PROD-001", "almacen_codigo": "ALM-ELALTO-GEN", "cantidad_actual": Decimal("50")},
+    {"producto_codigo": "PROD-001", "almacen_codigo": "ALM-CENTRAL-GEN", "cantidad_actual": Decimal("50")},
     {"producto_codigo": "PROD-002", "almacen_codigo": "ALM-CENTRAL-GEN", "cantidad_actual": Decimal("120")},
-    {"producto_codigo": "PROD-002", "almacen_codigo": "ALM-ZN-GEN", "cantidad_actual": Decimal("60")},
-    {"producto_codigo": "PROD-003", "almacen_codigo": "ALM-CENTRAL-GEN", "cantidad_actual": Decimal("80")},
-    {"producto_codigo": "PROD-003", "almacen_codigo": "ALM-PRADO-GEN", "cantidad_actual": Decimal("40")},
-    {"producto_codigo": "PROD-004", "almacen_codigo": "ALM-CENTRAL-GEN", "cantidad_actual": Decimal("90")},
-    {"producto_codigo": "PROD-004", "almacen_codigo": "ALM-ELALTO-GEN", "cantidad_actual": Decimal("35")},
-    {"producto_codigo": "PROD-005", "almacen_codigo": "ALM-CENTRAL-GEN", "cantidad_actual": Decimal("120")},
-    {"producto_codigo": "PROD-005", "almacen_codigo": "ALM-MELCHOR", "cantidad_actual": Decimal("80")},
+    {"producto_codigo": "PROD-003", "almacen_codigo": "ALM-ZN-GEN", "cantidad_actual": Decimal("80")},
 ]
 
 SEED_OBSERVACION = "Carga inicial de inventario (seed)"
