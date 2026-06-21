@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS venta_detalles (
     id SERIAL PRIMARY KEY,
     venta_id INTEGER NOT NULL REFERENCES ventas(id) ON DELETE CASCADE,
     producto_id INTEGER NOT NULL,
-    cantidad NUMERIC(14,4) NOT NULL,
+    cantidad NUMERIC(14,4) NOT NULL CHECK (cantidad = TRUNC(cantidad)),
     precio_unitario NUMERIC(14,2) NOT NULL,
     subtotal NUMERIC(14,2) NOT NULL
 );

@@ -24,12 +24,16 @@ class CatalogosClient:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(url)
                 if response.status_code == 404:
-                    raise HTTPException(status_code=400, detail=f"Sin stock del producto {producto_id}")
-                data = response.json()
-                if float(data.get("cantidad_actual", 0)) < cantidad:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Stock insuficiente producto {producto_id}. Disponible: {data.get('cantidad_actual')}",
+                        detail=f"El producto {producto_id} no tiene existencia registrada en este almacén",
+                    )
+                data = response.json()
+                disponible = float(data.get("cantidad_actual", 0))
+                if disponible < cantidad:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Stock insuficiente producto {producto_id}. Disponible: {disponible}, solicitado: {cantidad}",
                     )
         except httpx.RequestError as exc:
             raise HTTPException(status_code=503, detail=f"Inventario no disponible: {exc}") from exc

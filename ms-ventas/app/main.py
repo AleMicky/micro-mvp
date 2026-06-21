@@ -25,5 +25,5 @@ app = FastAPI(title="MS Ventas", version="0.1.0", lifespan=lifespan)
 app.include_router(health.router)
 app.include_router(clientes.router)
 app.include_router(cotizaciones.router)
-app.include_router(facturas.router)  # /ventas/facturas antes de /ventas/{id}
+app.include_router(facturas.router)
 app.include_router(ventas.router)

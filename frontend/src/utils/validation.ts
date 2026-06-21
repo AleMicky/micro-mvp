@@ -8,3 +8,6 @@ export const positiveNumberRule = (value: unknown) =>
 
 export const nonNegativeRule = (value: unknown) =>
   (value !== null && value !== '' && Number(value) >= 0) || 'Debe ser 0 o mayor'
+
+export const integerRule = (value: unknown) =>
+  (value !== null && value !== '' && Number.isInteger(Number(value))) || 'Debe ser un número entero'

@@ -6,7 +6,7 @@ from app.crud.ventas import crud_factura
 from app.schemas.ventas import FacturaCreate, FacturaResponse
 from app.services.venta import venta_service
 
-router = APIRouter(prefix="/ventas/facturas", tags=["facturas"])
+router = APIRouter(prefix="/facturas", tags=["facturas"])
 
 @router.get("", response_model=list[FacturaResponse])
 async def listar(skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=500), db: AsyncSession = Depends(get_db)):

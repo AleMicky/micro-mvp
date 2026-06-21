@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class AuditoriaSchema(BaseModel):
     activo: bool = True
@@ -39,6 +39,13 @@ class DetalleBase(BaseModel):
     cantidad: Decimal = Field(..., gt=0)
     precio_unitario: Decimal = Field(..., ge=0)
 
+    @field_validator("cantidad")
+    @classmethod
+    def cantidad_debe_ser_entera(cls, value: Decimal) -> Decimal:
+        if value != value.to_integral_value():
+            raise ValueError("La cantidad debe ser un número entero")
+        return value
+
 class DetalleCreate(DetalleBase):
     pass
 
@@ -74,7 +81,7 @@ class CotizacionVentaResponse(CotizacionVentaBase, AuditoriaResponse):
 class VentaBase(BaseModel):
     cliente_id: int
     cotizacion_id: int | None = None
-    almacen_id: int = 1
+    almacen_id: int
     fecha: str | None = None
     observaciones: str | None = None
     estado: str = "BORRADOR"

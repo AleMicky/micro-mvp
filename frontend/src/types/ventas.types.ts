@@ -18,7 +18,7 @@ export type ClienteCreate = Omit<Cliente, 'id' | 'creado_en' | 'actualizado_en'>
 
 export interface DetalleVenta {
   id?: number
-  producto_id: number
+  producto_id: number | null
   cantidad: number | string
   precio_unitario: number | string
   subtotal?: number | string
@@ -59,7 +59,7 @@ export interface Venta extends Auditoria {
 export interface VentaCreate {
   cliente_id: number
   cotizacion_id?: number | null
-  almacen_id?: number
+  almacen_id: number
   estado?: string
   fecha?: string | null
   observaciones?: string | null

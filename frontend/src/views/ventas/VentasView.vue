@@ -1,25 +1,34 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import BaseDataTable from '@/components/BaseDataTable.vue'
 import { ventasService } from '@/services/ventas.service'
 import { catalogosService } from '@/services/catalogos.service'
 import { inventarioService } from '@/services/inventario.service'
 import { getErrorMessage } from '@/services/api'
 import { useAppStore } from '@/stores/app.store'
-import { requiredRule } from '@/utils/validation'
+import { integerRule, requiredRule } from '@/utils/validation'
+import { generarVentaPdf } from '@/utils/pdf'
 import { useBarcodeScanner } from '@/composables/useBarcodeScanner'
 import { ESTADO_VENTA_COLORS, type Cliente, type DetalleVenta, type Venta } from '@/types/ventas.types'
 import type { Producto } from '@/types/catalogos.types'
 import type { Almacen } from '@/types/inventario.types'
+
+interface ExistenciaResumen {
+  cantidad_actual: number
+  stock_minimo: number
+}
 
 const appStore = useAppStore()
 const items = ref<Venta[]>([])
 const clientes = ref<Cliente[]>([])
 const productos = ref<Producto[]>([])
 const almacenes = ref<Almacen[]>([])
+const existenciasMap = ref<Record<number, ExistenciaResumen>>({})
 const loading = ref(false)
 const loadingCatalogos = ref(false)
+const loadingExistencias = ref(false)
 const saving = ref(false)
+const confirmandoIds = ref<Set<number>>(new Set())
 const search = ref('')
 const dialog = ref(false)
 const ventaFormRef = ref<{ validate: () => Promise<{ valid: boolean }> } | null>(null)
@@ -27,11 +36,11 @@ const ventaFormRef = ref<{ validate: () => Promise<{ valid: boolean }> } | null>
 const headers = [
   { title: 'Código', key: 'codigo' }, { title: 'Cliente', key: 'cliente_id' },
   { title: 'Total', key: 'total' }, { title: 'Estado', key: 'estado' }, { title: 'Fecha', key: 'fecha' },
-  { title: 'Acciones', key: 'actions', sortable: false, align: 'end' as const },
+  { title: 'Acciones', key: 'actions', sortable: false, align: 'end' as const, width: 160 },
 ]
 
 function defaultDetalle(): DetalleVenta {
-  return { producto_id: 0, cantidad: 1, precio_unitario: 0 }
+  return { producto_id: null, cantidad: 1, precio_unitario: 0 }
 }
 
 const form = reactive({
@@ -42,10 +51,53 @@ const form = reactive({
 })
 
 const clienteMap = computed(() => Object.fromEntries(clientes.value.map((c) => [c.id, c.nombre])))
+const clientesPorId = computed(() => Object.fromEntries(clientes.value.map((c) => [c.id, c])))
+const almacenMap = computed(() => Object.fromEntries(almacenes.value.map((a) => [a.id, a.nombre])))
+const productoMap = computed(() => Object.fromEntries(productos.value.map((p) => [p.id, p.nombre])))
 
 const totalVenta = computed(() =>
   form.detalles.reduce((acc, d) => acc + (Number(d.cantidad) || 0) * (Number(d.precio_unitario) || 0), 0),
 )
+
+function tieneStockVendible(productoId: number): boolean {
+  const existencia = existenciasMap.value[productoId]
+  if (!existencia) return false
+  return existencia.cantidad_actual > existencia.stock_minimo
+}
+
+const productosConStock = computed(() => productos.value.filter((p) => tieneStockVendible(p.id)))
+
+async function loadExistencias(almacenId: number | null) {
+  if (!almacenId) {
+    existenciasMap.value = {}
+    return
+  }
+  loadingExistencias.value = true
+  try {
+    const { data } = await inventarioService.getExistenciasByAlmacen(almacenId)
+    existenciasMap.value = Object.fromEntries(
+      data.map((e) => [e.producto_id, { cantidad_actual: e.cantidad_actual, stock_minimo: e.stock_minimo }]),
+    )
+  } catch (e) {
+    appStore.showError(getErrorMessage(e))
+    existenciasMap.value = {}
+  } finally {
+    loadingExistencias.value = false
+  }
+}
+
+async function revalidarDetalles() {
+  for (const detalle of form.detalles) {
+    if (detalle.producto_id && !tieneStockVendible(detalle.producto_id)) {
+      detalle.producto_id = null
+    }
+  }
+}
+
+watch(() => form.almacen_id, async (almacenId) => {
+  await loadExistencias(almacenId)
+  await revalidarDetalles()
+})
 
 async function loadData() {
   loading.value = true
@@ -84,6 +136,7 @@ function openCreate() {
     detalles: [defaultDetalle()],
   })
   dialog.value = true
+  loadExistencias(form.almacen_id)
 }
 
 function agregarDetalle() {
@@ -101,12 +154,29 @@ function onProductoSelected(detalle: DetalleVenta) {
   }
 }
 
+function bloquearDecimal(event: KeyboardEvent) {
+  if (event.key === '.' || event.key === ',') {
+    event.preventDefault()
+  }
+}
+
+function onCantidadInput(detalle: DetalleVenta) {
+  const n = Number(detalle.cantidad)
+  if (Number.isFinite(n) && !Number.isInteger(n)) {
+    detalle.cantidad = Math.trunc(n) || 1
+  }
+}
+
 function agregarProductoPorCodigoBarras(codigo: string) {
   if (!dialog.value) return
 
   const producto = productos.value.find((p) => p.codigo_barras === codigo)
   if (!producto) {
     appStore.showError(`No se encontró ningún producto con el código de barras "${codigo}"`)
+    return
+  }
+  if (!tieneStockVendible(producto.id)) {
+    appStore.showError(`Sin stock disponible de "${producto.nombre}" en el almacén seleccionado`)
     return
   }
 
@@ -134,25 +204,39 @@ useBarcodeScanner(agregarProductoPorCodigoBarras)
 
 async function saveVenta() {
   if (!(await ventaFormRef.value?.validate())?.valid) return
-  if (!form.cliente_id) {
-    appStore.showError('Seleccione un cliente')
+  if (!form.cliente_id || !form.almacen_id) {
+    appStore.showError('Seleccione un cliente y un almacén')
     return
   }
-  const detallesValidos = form.detalles.filter((d) => d.producto_id && Number(d.cantidad) > 0)
+  const detallesValidos = form.detalles.filter(
+    (d): d is DetalleVenta & { producto_id: number } => !!d.producto_id && Number(d.cantidad) > 0,
+  )
   if (!detallesValidos.length) {
     appStore.showError('Agregue al menos un producto con cantidad mayor a 0')
     return
+  }
+
+  await loadExistencias(form.almacen_id)
+  for (const detalle of detallesValidos) {
+    const existencia = existenciasMap.value[detalle.producto_id]
+    const disponible = existencia ? existencia.cantidad_actual - existencia.stock_minimo : 0
+    if (disponible < Number(detalle.cantidad)) {
+      const nombre = productos.value.find((p) => p.id === detalle.producto_id)?.nombre ?? detalle.producto_id
+      appStore.showError(`Stock insuficiente de "${nombre}". Disponible: ${Math.max(disponible, 0)}`)
+      await revalidarDetalles()
+      return
+    }
   }
 
   saving.value = true
   try {
     await ventasService.createVenta({
       cliente_id: form.cliente_id,
-      almacen_id: form.almacen_id ?? undefined,
+      almacen_id: form.almacen_id,
       observaciones: form.observaciones || null,
       detalles: detallesValidos.map((d) => ({
         producto_id: d.producto_id,
-        cantidad: Number(d.cantidad),
+        cantidad: Math.trunc(Number(d.cantidad)),
         precio_unitario: Number(d.precio_unitario),
       })),
     })
@@ -161,14 +245,38 @@ async function saveVenta() {
     await loadData()
   } catch (e) {
     appStore.showError(getErrorMessage(e))
+    await loadExistencias(form.almacen_id)
+    await revalidarDetalles()
   } finally {
     saving.value = false
   }
 }
 
+function descargarPdf(item: Venta) {
+  try {
+    generarVentaPdf({
+      venta: item,
+      cliente: clientesPorId.value[item.cliente_id] ?? null,
+      almacenNombre: almacenMap.value[item.almacen_id] ?? null,
+      productoNombre: (productoId) => (productoId != null ? productoMap.value[productoId] ?? `Producto #${productoId}` : '—'),
+    })
+  } catch (e) {
+    appStore.showError(getErrorMessage(e))
+  }
+}
+
 async function confirmar(item: Venta) {
-  try { await ventasService.confirmarVenta(item.id); appStore.showSuccess('Venta confirmada'); await loadData() }
-  catch (e) { appStore.showError(getErrorMessage(e)) }
+  if (confirmandoIds.value.has(item.id)) return
+  confirmandoIds.value.add(item.id)
+  try {
+    await ventasService.confirmarVenta(item.id)
+    appStore.showSuccess('Venta confirmada')
+    await loadData()
+  } catch (e) {
+    appStore.showError(getErrorMessage(e))
+  } finally {
+    confirmandoIds.value.delete(item.id)
+  }
 }
 
 onMounted(() => {
@@ -185,7 +293,24 @@ onMounted(() => {
     <template #item.cliente_id="{ value }">{{ clienteMap[value] ?? value }}</template>
     <template #item.estado="{ value }"><v-chip :color="ESTADO_VENTA_COLORS[value] ?? 'default'" size="small" variant="tonal">{{ value }}</v-chip></template>
     <template #item.actions="{ item }">
-      <v-btn v-if="['BORRADOR','PENDIENTE'].includes(item.estado)" size="small" color="primary" variant="tonal" @click="confirmar(item)">Confirmar</v-btn>
+      <v-btn
+        v-if="['BORRADOR','PENDIENTE'].includes(item.estado)"
+        size="small"
+        color="primary"
+        variant="tonal"
+        class="mr-2"
+        :loading="confirmandoIds.has(item.id)"
+        :disabled="confirmandoIds.has(item.id)"
+        @click="confirmar(item)"
+      >Confirmar</v-btn>
+      <v-btn
+        icon="mdi-file-pdf-box"
+        size="small"
+        variant="text"
+        color="error"
+        title="Descargar PDF"
+        @click="descargarPdf(item)"
+      />
     </template>
   </BaseDataTable>
 
@@ -224,6 +349,7 @@ onMounted(() => {
                 item-value="id"
                 label="Almacén"
                 prepend-inner-icon="mdi-warehouse"
+                :rules="[requiredRule]"
                 :loading="loadingCatalogos"
                 variant="outlined"
                 density="comfortable"
@@ -239,11 +365,15 @@ onMounted(() => {
           <div v-for="(detalle, index) in form.detalles" :key="index" class="detalle-row">
             <v-select
               v-model="detalle.producto_id"
-              :items="productos"
+              :items="productosConStock"
               item-title="nombre"
               item-value="id"
               label="Producto"
               :rules="[requiredRule]"
+              :loading="loadingExistencias"
+              :disabled="!form.almacen_id"
+              :hint="!form.almacen_id ? 'Seleccione un almacén primero' : 'Solo productos con stock disponible (por encima del mínimo) en este almacén'"
+              persistent-hint
               variant="outlined"
               density="compact"
               class="detalle-row__producto"
@@ -253,11 +383,14 @@ onMounted(() => {
               v-model.number="detalle.cantidad"
               label="Cantidad"
               type="number"
-              min="0.01"
-              step="0.01"
+              min="1"
+              step="1"
+              :rules="[requiredRule, integerRule]"
               variant="outlined"
               density="compact"
               class="detalle-row__cantidad"
+              @keydown="bloquearDecimal"
+              @update:model-value="onCantidadInput(detalle)"
             />
             <v-text-field
               v-model.number="detalle.precio_unitario"
@@ -298,7 +431,7 @@ onMounted(() => {
       <v-card-actions class="pa-4">
         <v-spacer />
         <v-btn variant="text" @click="dialog = false">Cancelar</v-btn>
-        <v-btn color="primary" variant="flat" :loading="saving" @click="saveVenta">Crear venta</v-btn>
+        <v-btn color="primary" variant="flat" :loading="saving" :disabled="saving" @click="saveVenta">Crear venta</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
