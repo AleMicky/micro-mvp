@@ -27,18 +27,18 @@ export const inventarioService = {
     return api.delete(`/inventario/almacenes/${id}`)
   },
 
-  getExistencias() {
-    return api.get<Existencia[]>('/inventario/existencias')
+  getExistencias(params?: { limit?: number }) {
+    return api.get<Existencia[]>('/inventario/existencias', { params })
   },
-  getExistenciasByProducto(productoId: number) {
-    return api.get<Existencia[]>(`/inventario/existencias/producto/${productoId}`)
+  getExistenciasByProducto(productoId: number, params?: { limit?: number }) {
+    return api.get<Existencia[]>(`/inventario/existencias/producto/${productoId}`, { params })
   },
-  getExistenciasByAlmacen(almacenId: number) {
-    return api.get<Existencia[]>(`/inventario/existencias/almacen/${almacenId}`)
+  getExistenciasByAlmacen(almacenId: number, params?: { limit?: number }) {
+    return api.get<Existencia[]>(`/inventario/existencias/almacen/${almacenId}`, { params })
   },
 
-  getMovimientos() {
-    return api.get<MovimientoInventario[]>('/inventario/movimientos')
+  getMovimientos(params?: { limit?: number; skip?: number }) {
+    return api.get<MovimientoInventario[]>('/inventario/movimientos', { params })
   },
   getKardex(productoId: number) {
     return api.get<KardexResponse>(`/inventario/kardex/producto/${productoId}`)

@@ -38,7 +38,7 @@ class CRUDExistencia:
             stmt = stmt.where(Existencia.producto_id == producto_id)
         if almacen_id is not None:
             stmt = stmt.where(Existencia.almacen_id == almacen_id)
-        stmt = stmt.offset(skip).limit(limit)
+        stmt = stmt.order_by(Existencia.actualizado_en.desc()).offset(skip).limit(limit)
         result = await db.execute(stmt)
         return list(result.scalars().all())
 

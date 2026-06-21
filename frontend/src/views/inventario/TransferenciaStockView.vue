@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import BaseDataTable from '@/components/BaseDataTable.vue'
+import MovimientosInventarioTable from '@/components/MovimientosInventarioTable.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useMovimientosInventario } from '@/composables/useMovimientosInventario'
 import { catalogosService } from '@/services/catalogos.service'
 import { inventarioService } from '@/services/inventario.service'
 import { getErrorMessage } from '@/services/api'
@@ -9,7 +10,7 @@ import { useAppStore } from '@/stores/app.store'
 import { formatInteger } from '@/utils/format'
 import { positiveNumberRule, requiredRule } from '@/utils/validation'
 import type { Producto } from '@/types/catalogos.types'
-import type { Almacen, MovimientoInventario, TipoMovimiento } from '@/types/inventario.types'
+import type { Almacen } from '@/types/inventario.types'
 
 interface DetalleRow {
   key: number
@@ -21,11 +22,9 @@ const appStore = useAppStore()
 
 const productos = ref<Producto[]>([])
 const almacenes = ref<Almacen[]>([])
-const movimientos = ref<MovimientoInventario[]>([])
 const existenciasOrigen = ref<Record<number, number>>({})
 const catalogosReady = ref(false)
 const loadingExistencias = ref(false)
-const loadingMovimientos = ref(false)
 const saving = ref(false)
 const search = ref('')
 const nextRowKey = ref(1)
@@ -41,10 +40,24 @@ const form = reactive({
   observaciones: '',
 })
 
+const { loading: loadingMovimientos, filteredRows, refresh: refreshMovimientos } =
+  useMovimientosInventario()
+
+const transferenciasBase = filteredRows({
+  tipos: ['TRANSFERENCIA_SALIDA', 'TRANSFERENCIA_ENTRADA'],
+})
+
+const transferenciasVisibles = computed(() => {
+  if (!form.almacen_origen_id && !form.almacen_destino_id) return transferenciasBase.value
+  const ids = [form.almacen_origen_id, form.almacen_destino_id].filter(
+    (id): id is number => id != null,
+  )
+  return transferenciasBase.value.filter((m) => ids.includes(m.almacen_id))
+})
+
 const detalles = ref<DetalleRow[]>([{ key: 0, producto_id: null, cantidad: null }])
 
 const productoMap = computed(() => Object.fromEntries(productos.value.map((p) => [p.id, p.nombre])))
-const almacenMap = computed(() => Object.fromEntries(almacenes.value.map((a) => [a.id, a.nombre])))
 
 const almacenesDestino = computed(() =>
   almacenes.value.filter((a) => a.id !== form.almacen_origen_id),
@@ -57,26 +70,6 @@ const almacenesOrigen = computed(() =>
 const validLineCount = computed(
   () => detalles.value.filter((d) => d.producto_id && d.cantidad && d.cantidad > 0).length,
 )
-
-const transferenciasFiltradas = computed(() => {
-  const tipos: TipoMovimiento[] = ['TRANSFERENCIA_SALIDA', 'TRANSFERENCIA_ENTRADA']
-  return movimientos.value.filter((m) => {
-    if (!tipos.includes(m.tipo)) return false
-    if (form.almacen_origen_id && m.almacen_id !== form.almacen_origen_id && m.almacen_id !== form.almacen_destino_id) {
-      return false
-    }
-    return true
-  })
-})
-
-const headers = [
-  { title: 'Tipo', key: 'tipo', width: 108 },
-  { title: 'Producto', key: 'producto_id' },
-  { title: 'Almacén', key: 'almacen_id' },
-  { title: 'Cant.', key: 'cantidad', align: 'end' as const, width: 64 },
-  { title: 'Obs.', key: 'observaciones', width: 120 },
-  { title: 'Fecha', key: 'creado_en', width: 130 },
-]
 
 const sameAlmacenRule = () =>
   form.almacen_origen_id !== form.almacen_destino_id || 'Origen y destino deben ser diferentes'
@@ -165,18 +158,6 @@ async function loadExistenciasOrigen(almacenId: number) {
   }
 }
 
-async function loadMovimientos() {
-  loadingMovimientos.value = true
-  try {
-    const { data } = await inventarioService.getMovimientos()
-    movimientos.value = data
-  } catch (error) {
-    appStore.showError(getErrorMessage(error))
-  } finally {
-    loadingMovimientos.value = false
-  }
-}
-
 async function submitForm() {
   const validation = await formRef.value?.validate()
   if (!validation?.valid) return
@@ -209,7 +190,7 @@ async function submitForm() {
     resetDetalles()
     formRef.value?.resetValidation()
     await Promise.all([
-      loadMovimientos(),
+      refreshMovimientos(),
       form.almacen_origen_id ? loadExistenciasOrigen(form.almacen_origen_id) : Promise.resolve(),
     ])
   } catch (error) {
@@ -217,15 +198,6 @@ async function submitForm() {
   } finally {
     saving.value = false
   }
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleString('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 watch(
@@ -240,7 +212,7 @@ watch(
 )
 
 onMounted(async () => {
-  await Promise.all([loadCatalogos(), loadMovimientos()])
+  await Promise.all([loadCatalogos(), refreshMovimientos()])
 })
 </script>
 
@@ -435,64 +407,14 @@ onMounted(async () => {
       </v-card>
 
       <div class="historial-section">
-        <BaseDataTable
+        <MovimientosInventarioTable
           v-model:search="search"
-          :items="transferenciasFiltradas as Record<string, unknown>[]"
-          :headers="headers"
+          :items="transferenciasVisibles"
           :loading="loadingMovimientos"
           title="Transferencias recientes"
           subtitle="Historial de movimientos entre almacenes"
-          search-label="Buscar..."
-          empty-subtitle="Las transferencias registradas aparecerán aquí."
-        >
-          <template #actions>
-            <v-btn
-              icon="mdi-refresh"
-              variant="text"
-              size="small"
-              :loading="loadingMovimientos"
-              aria-label="Actualizar historial"
-              @click="loadMovimientos"
-            />
-          </template>
-
-          <template #item.tipo="{ value }">
-            <v-chip
-              :color="value === 'TRANSFERENCIA_ENTRADA' ? 'success' : 'secondary'"
-              size="x-small"
-              variant="tonal"
-              label
-            >
-              {{ value === 'TRANSFERENCIA_ENTRADA' ? 'Entrada' : 'Salida' }}
-            </v-chip>
-          </template>
-
-          <template #item.producto_id="{ value }">
-            <span class="cell-ellipsis" :title="productoMap[value] ?? String(value)">
-              {{ productoMap[value] ?? value }}
-            </span>
-          </template>
-
-          <template #item.almacen_id="{ value }">
-            <span class="cell-ellipsis" :title="almacenMap[value] ?? String(value)">
-              {{ almacenMap[value] ?? value }}
-            </span>
-          </template>
-
-          <template #item.cantidad="{ value }">
-            <span class="font-weight-medium">{{ formatInteger(value) }}</span>
-          </template>
-
-          <template #item.observaciones="{ value }">
-            <span class="cell-ellipsis text-medium-emphasis" :title="value ?? ''">
-              {{ value || '—' }}
-            </span>
-          </template>
-
-          <template #item.creado_en="{ value }">
-            <span class="text-caption text-medium-emphasis">{{ formatDate(value) }}</span>
-          </template>
-        </BaseDataTable>
+          @refresh="refreshMovimientos"
+        />
       </div>
     </div>
   </div>

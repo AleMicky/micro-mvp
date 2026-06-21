@@ -8,6 +8,8 @@ import { ventasService } from '@/services/ventas.service'
 import { finanzasService } from '@/services/finanzas.service'
 import { getErrorMessage } from '@/services/api'
 import { useAppStore } from '@/stores/app.store'
+import MovimientosInventarioTable from '@/components/MovimientosInventarioTable.vue'
+import { enrichMovimiento } from '@/utils/inventario-movimientos'
 import type { Existencia, MovimientoInventario } from '@/types/inventario.types'
 import type { OrdenCompra } from '@/types/compras.types'
 
@@ -21,6 +23,12 @@ const ventasMes = ref(0)
 const totalCxc = ref(0)
 const totalCxp = ref(0)
 const movimientosRecientes = ref<MovimientoInventario[]>([])
+const productoMap = ref<Record<number, { nombre: string; codigo?: string }>>({})
+const almacenMap = ref<Record<number, string>>({})
+
+const movimientosRows = computed(() =>
+  movimientosRecientes.value.map((m) => enrichMovimiento(m, productoMap.value, almacenMap.value)),
+)
 
 const stats = computed(() => [
   { title: 'Productos', value: totalProductos.value, icon: 'mdi-package-variant-closed', color: 'primary', hint: 'En catálogo' },
@@ -32,19 +40,6 @@ const stats = computed(() => [
   { title: 'Cuentas por pagar', value: totalCxp.value, icon: 'mdi-cash-minus', color: 'error', hint: 'Saldo pendiente' },
   { title: 'Movimientos', value: movimientosRecientes.value.length, icon: 'mdi-swap-horizontal', color: 'primary', hint: 'Recientes' },
 ])
-
-const movimientoHeaders = [
-  { title: 'Tipo', key: 'tipo' },
-  { title: 'Producto', key: 'producto_id' },
-  { title: 'Almacén', key: 'almacen_id' },
-  { title: 'Cantidad', key: 'cantidad' },
-  { title: 'Fecha', key: 'creado_en' },
-]
-
-const tipoColors: Record<string, string> = {
-  INGRESO: 'success', SALIDA: 'error', AJUSTE_POSITIVO: 'info', AJUSTE_NEGATIVO: 'warning',
-  TRANSFERENCIA_SALIDA: 'secondary', TRANSFERENCIA_ENTRADA: 'primary',
-}
 
 function countStockBajo(existencias: Existencia[]) {
   return existencias.filter((e) => Number(e.cantidad_actual) <= Number(e.stock_minimo) && Number(e.stock_minimo) > 0).length
@@ -61,7 +56,7 @@ async function loadDashboard() {
       catalogosService.getProductos(),
       inventarioService.getAlmacenes(),
       inventarioService.getExistencias(),
-      inventarioService.getMovimientos(),
+      inventarioService.getMovimientos({ limit: 500 }),
       comprasService.getOrdenes(),
       ventasService.getVentas(),
       finanzasService.getCuentasPorCobrar(),
@@ -70,6 +65,10 @@ async function loadDashboard() {
 
     totalProductos.value = productosRes.data.length
     totalAlmacenes.value = almacenesRes.data.length
+    productoMap.value = Object.fromEntries(
+      productosRes.data.map((p) => [p.id, { nombre: p.nombre, codigo: p.codigo }]),
+    )
+    almacenMap.value = Object.fromEntries(almacenesRes.data.map((a) => [a.id, a.nombre]))
     stockBajo.value = countStockBajo(existenciasRes.data)
     comprasPendientes.value = ordenesRes.data.filter((o: OrdenCompra) => ['PENDIENTE', 'APROBADA'].includes(o.estado)).length
     ventasMes.value = ventasRes.data.length
@@ -108,19 +107,14 @@ onMounted(loadDashboard)
       </v-col>
       </v-row>
 
-      <v-card class="mt-3 mx-0" border elevation="0">
-        <v-card-title class="pa-3 pb-1">
-        <div class="text-subtitle-1 font-weight-bold">Movimientos recientes</div>
-      </v-card-title>
-        <v-card-text class="pa-3 pt-0">
-        <v-data-table density="compact" :headers="movimientoHeaders" :items="movimientosRecientes" :loading="loading" item-value="id" hover :items-per-page="8" hide-default-footer>
-          <template #item.tipo="{ value }">
-            <v-chip :color="tipoColors[value] ?? 'default'" size="small" variant="tonal">{{ value }}</v-chip>
-          </template>
-          <template #item.creado_en="{ value }">{{ new Date(value).toLocaleString('es-MX') }}</template>
-        </v-data-table>
-        </v-card-text>
-      </v-card>
+      <MovimientosInventarioTable
+        :items="movimientosRows"
+        :loading="loading"
+        title="Movimientos recientes de inventario"
+        subtitle="Recepciones, ingresos, salidas, ajustes y transferencias"
+        :show-search="false"
+        compact
+      />
     </v-container>
   </div>
 </template>
