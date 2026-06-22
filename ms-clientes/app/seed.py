@@ -24,6 +24,14 @@ CLIENTES_SEED = [
         "telefono": "70000001",
         "puntos": 0,
     },
+    {
+        "codigo": "CLI-WHATSAPP",
+        "nombre": "Mostrador WhatsApp",
+        "documento": "0",
+        "email": None,
+        "telefono": None,
+        "puntos": 0,
+    },
 ]
 
 

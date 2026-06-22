@@ -146,7 +146,14 @@ const menuSections: MenuSection[] = [
           { title: 'Permisos', icon: 'mdi-key-outline', to: '/seguridad/permisos' },
         ],
       },
-      { title: 'Asistente IA', icon: 'mdi-robot-outline', to: '/chatbot' },
+      {
+        title: 'Asistente IA',
+        icon: 'mdi-robot-outline',
+        children: [
+          { title: 'Conversaciones', icon: 'mdi-whatsapp', to: '/chatbot' },
+          { title: 'Etiquetas', icon: 'mdi-tag-multiple-outline', to: '/chatbot/etiquetas' },
+        ],
+      },
     ],
   },
 ]

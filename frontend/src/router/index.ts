@@ -60,6 +60,11 @@ const router = createRouter({
           component: () => import('@/views/chatbot/ChatbotView.vue'),
         },
         {
+          path: 'chatbot/etiquetas',
+          name: 'chatbot-etiquetas',
+          component: () => import('@/views/chatbot/EtiquetasView.vue'),
+        },
+        {
           path: 'catalogos/categorias',
           name: 'categorias',
           component: () => import('@/views/catalogos/CategoriasView.vue'),

@@ -16,12 +16,18 @@ class MensajeService:
         direccion: str,
         texto: str,
         wa_message_id: str | None = None,
+        origen: str = "bot",
+        tipo_mensaje: str = "texto",
+        nombre_archivo: str | None = None,
     ) -> ChatbotMensaje:
         mensaje = ChatbotMensaje(
             conversacion_id=conversacion_id,
             direccion=direccion,
             texto=texto,
             wa_message_id=wa_message_id,
+            origen=origen,
+            tipo_mensaje=tipo_mensaje,
+            nombre_archivo=nombre_archivo,
         )
         db.add(mensaje)
         await db.commit()

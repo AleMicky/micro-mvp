@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.conversacion import ChatbotConversacion
 from app.services import bot_config
 from app.services.catalogos import catalogos_client
@@ -9,6 +11,8 @@ from app.services.company import company_client
 from app.services.conversacion import conversacion_service
 from app.services.inventario import inventario_client
 from app.services.openai_client import openai_client
+from app.services.pdf_pedido import generar_pdf_pedido
+from app.services.ventas import ventas_client
 
 
 @dataclass
@@ -17,6 +21,8 @@ class ResultadoBot:
     opciones: list[str] | None
     nuevo_estado: str
     nuevo_contexto: dict
+    pdf_pendiente: bytes | None = None
+    pdf_nombre: str | None = None
 
 
 def resolver_seleccion(texto: str, opciones: list[dict]) -> dict | None:
@@ -35,11 +41,12 @@ def resolver_seleccion(texto: str, opciones: list[dict]) -> dict | None:
 
 
 async def handle_menu(conversacion: ChatbotConversacion, texto: str) -> ResultadoBot:
+    carrito = conversacion.contexto.get("carrito")
     return ResultadoBot(
         respuesta=bot_config.MENSAJE_BIENVENIDA,
         opciones=bot_config.OPCIONES_MENU,
         nuevo_estado="menu",
-        nuevo_contexto={},
+        nuevo_contexto={"carrito": carrito} if carrito else {},
     )
 
 
@@ -85,48 +92,53 @@ async def handle_vendedor_ia(conversacion: ChatbotConversacion, texto: str) -> R
     if not respuesta:
         return await handle_menu(conversacion, texto)
 
+    carrito = conversacion.contexto.get("carrito")
     return ResultadoBot(
         respuesta=respuesta,
         opciones=bot_config.OPCIONES_MENU,
         nuevo_estado="menu",
-        nuevo_contexto={},
+        nuevo_contexto={"carrito": carrito} if carrito else {},
     )
 
 
 async def handle_horario(conversacion: ChatbotConversacion, texto: str) -> ResultadoBot:
+    carrito = conversacion.contexto.get("carrito")
     return ResultadoBot(
         respuesta=bot_config.MENSAJE_HORARIO,
         opciones=bot_config.OPCIONES_MENU,
         nuevo_estado="menu",
-        nuevo_contexto={},
+        nuevo_contexto={"carrito": carrito} if carrito else {},
     )
 
 
 async def handle_ubicacion(conversacion: ChatbotConversacion, texto: str) -> ResultadoBot:
+    carrito = conversacion.contexto.get("carrito")
     return ResultadoBot(
         respuesta=bot_config.MENSAJE_UBICACION,
         opciones=bot_config.OPCIONES_MENU,
         nuevo_estado="menu",
-        nuevo_contexto={},
+        nuevo_contexto={"carrito": carrito} if carrito else {},
     )
 
 
 async def handle_soporte(conversacion: ChatbotConversacion, texto: str) -> ResultadoBot:
+    carrito = conversacion.contexto.get("carrito")
     return ResultadoBot(
         respuesta=bot_config.MENSAJE_SOPORTE,
         opciones=bot_config.OPCIONES_MENU,
         nuevo_estado="soporte",
-        nuevo_contexto={},
+        nuevo_contexto={"carrito": carrito} if carrito else {},
     )
 
 
 async def handle_agencias(conversacion: ChatbotConversacion, texto: str) -> ResultadoBot:
     agencias_contexto = conversacion.contexto.get("agencias") if conversacion.estado == "agencias" else None
+    carrito = conversacion.contexto.get("carrito")
 
     if agencias_contexto:
         seleccion = resolver_seleccion(texto, agencias_contexto)
         if seleccion:
-            return await _mostrar_categorias(seleccion["id"], seleccion["nombre"])
+            return await _mostrar_categorias(seleccion["id"], seleccion["nombre"], carrito)
 
     almacenes = await inventario_client.listar_almacenes()
     if not almacenes:
@@ -134,7 +146,7 @@ async def handle_agencias(conversacion: ChatbotConversacion, texto: str) -> Resu
             respuesta="❌ Por el momento no tenemos agencias disponibles.",
             opciones=bot_config.OPCIONES_MENU,
             nuevo_estado="menu",
-            nuevo_contexto={},
+            nuevo_contexto={"carrito": carrito} if carrito else {},
         )
 
     sucursales = await company_client.listar_sucursales()
@@ -152,18 +164,18 @@ async def handle_agencias(conversacion: ChatbotConversacion, texto: str) -> Resu
         respuesta="🏬 Selecciona una agencia escribiendo su número o nombre:",
         opciones=nombres,
         nuevo_estado="agencias",
-        nuevo_contexto={"agencias": opciones_contexto},
+        nuevo_contexto={"agencias": opciones_contexto, "carrito": carrito},
     )
 
 
-async def _mostrar_categorias(almacen_id: int, agencia_nombre: str) -> ResultadoBot:
+async def _mostrar_categorias(almacen_id: int, agencia_nombre: str, carrito: dict | None = None) -> ResultadoBot:
     categorias = await catalogos_client.listar_categorias()
     if not categorias:
         return ResultadoBot(
             respuesta="❌ Por el momento no tenemos categorías disponibles.",
             opciones=bot_config.OPCIONES_MENU,
             nuevo_estado="menu",
-            nuevo_contexto={},
+            nuevo_contexto={"carrito": carrito} if carrito else {},
         )
 
     opciones_contexto = [{"id": c["id"], "nombre": c["nombre"]} for c in categorias]
@@ -176,6 +188,7 @@ async def _mostrar_categorias(almacen_id: int, agencia_nombre: str) -> Resultado
             "categorias": opciones_contexto,
             "almacen_id": almacen_id,
             "agencia_nombre": agencia_nombre,
+            "carrito": carrito,
         },
     )
 
@@ -184,17 +197,18 @@ async def handle_catalogo_categorias(conversacion: ChatbotConversacion, texto: s
     categorias_contexto = conversacion.contexto.get("categorias") if conversacion.estado == "catalogo_categorias" else None
     almacen_id = conversacion.contexto.get("almacen_id")
     agencia_nombre = conversacion.contexto.get("agencia_nombre", "")
+    carrito = conversacion.contexto.get("carrito")
 
     if categorias_contexto and almacen_id is not None:
         seleccion = resolver_seleccion(texto, categorias_contexto)
         if seleccion:
-            return await _mostrar_productos(almacen_id, agencia_nombre, seleccion["id"], seleccion["nombre"])
+            return await _mostrar_productos(almacen_id, agencia_nombre, seleccion["id"], seleccion["nombre"], carrito)
 
     return await handle_agencias(conversacion, texto)
 
 
 async def _mostrar_productos(
-    almacen_id: int, agencia_nombre: str, categoria_id: int, categoria_nombre: str
+    almacen_id: int, agencia_nombre: str, categoria_id: int, categoria_nombre: str, carrito: dict | None = None
 ) -> ResultadoBot:
     productos = await catalogos_client.listar_productos()
     productos_categoria = [p for p in productos if p.get("categoria_id") == categoria_id]
@@ -204,7 +218,7 @@ async def _mostrar_productos(
             respuesta=f"❌ No hay productos disponibles en la categoría {categoria_nombre}.",
             opciones=bot_config.OPCIONES_MENU,
             nuevo_estado="menu",
-            nuevo_contexto={},
+            nuevo_contexto={"carrito": carrito} if carrito else {},
         )
 
     existencias = await inventario_client.listar_existencias_por_almacen(almacen_id)
@@ -233,6 +247,7 @@ async def _mostrar_productos(
             "categoria_nombre": categoria_nombre,
             "almacen_id": almacen_id,
             "agencia_nombre": agencia_nombre,
+            "carrito": carrito,
         },
     )
 
@@ -241,6 +256,7 @@ async def handle_catalogo_productos(conversacion: ChatbotConversacion, texto: st
     productos_contexto = conversacion.contexto.get("productos", [])
     almacen_id = conversacion.contexto.get("almacen_id")
     agencia_nombre = conversacion.contexto.get("agencia_nombre", "")
+    carrito = conversacion.contexto.get("carrito")
 
     seleccion = resolver_seleccion(texto, productos_contexto)
     if not seleccion:
@@ -252,12 +268,12 @@ async def handle_catalogo_productos(conversacion: ChatbotConversacion, texto: st
         )
 
     return await _mostrar_detalle_producto(
-        almacen_id, agencia_nombre, seleccion["id"], seleccion["categoria_id"]
+        almacen_id, agencia_nombre, seleccion["id"], seleccion["categoria_id"], carrito
     )
 
 
 async def _mostrar_detalle_producto(
-    almacen_id: int, agencia_nombre: str, producto_id: int, categoria_id: int
+    almacen_id: int, agencia_nombre: str, producto_id: int, categoria_id: int, carrito: dict | None = None
 ) -> ResultadoBot:
     producto = await catalogos_client.obtener_producto(producto_id)
     existencias = await inventario_client.listar_existencias_por_almacen(almacen_id)
@@ -278,15 +294,20 @@ async def _mostrar_detalle_producto(
     if producto.get("descripcion"):
         lineas.append(f"📝 Descripción: {producto['descripcion']}")
 
+    opciones = ["🔎 Ver más productos", "🔙 Menú principal"]
+    if cantidad > 0:
+        opciones.insert(0, "🛒 Agregar al carrito")
+
     return ResultadoBot(
         respuesta="\n".join(lineas),
-        opciones=["🔎 Ver más productos", "🔙 Menú principal"],
+        opciones=opciones,
         nuevo_estado="producto_detalle",
         nuevo_contexto={
             "producto_id": producto_id,
             "categoria_id": categoria_id,
             "almacen_id": almacen_id,
             "agencia_nombre": agencia_nombre,
+            "carrito": carrito,
         },
     )
 
@@ -296,17 +317,222 @@ async def handle_producto_detalle(conversacion: ChatbotConversacion, texto: str)
     almacen_id = conversacion.contexto.get("almacen_id")
     agencia_nombre = conversacion.contexto.get("agencia_nombre", "")
     categoria_id = conversacion.contexto.get("categoria_id")
+    carrito = conversacion.contexto.get("carrito")
+
+    if "agregar" in texto_normalizado or "carrito" in texto_normalizado:
+        return await _iniciar_agregar_carrito(conversacion)
 
     if "ver mas" in texto_normalizado or "mas productos" in texto_normalizado:
         if almacen_id is not None and categoria_id is not None:
-            return await _mostrar_productos(almacen_id, agencia_nombre, categoria_id, "la categoría seleccionada")
+            return await _mostrar_productos(almacen_id, agencia_nombre, categoria_id, "la categoría seleccionada", carrito)
         return await handle_agencias(conversacion, texto)
 
     return ResultadoBot(
         respuesta="🔙 Volviendo al menú principal...",
         opciones=bot_config.OPCIONES_MENU,
         nuevo_estado="menu",
+        nuevo_contexto={"carrito": carrito} if carrito else {},
+    )
+
+
+async def _iniciar_agregar_carrito(conversacion: ChatbotConversacion) -> ResultadoBot:
+    producto_id = conversacion.contexto.get("producto_id")
+    almacen_id = conversacion.contexto.get("almacen_id")
+    agencia_nombre = conversacion.contexto.get("agencia_nombre", "")
+    carrito = conversacion.contexto.get("carrito")
+
+    if carrito and carrito.get("almacen_id") != almacen_id:
+        return ResultadoBot(
+            respuesta=(
+                f"⚠️ Ya tienes productos en el carrito de {carrito.get('agencia_nombre')}. "
+                "Escribe 'carrito' para verlo y vaciarlo antes de agregar de otra agencia."
+            ),
+            opciones=["🛒 Ver carrito", "🔙 Menú principal"],
+            nuevo_estado="menu",
+            nuevo_contexto={"carrito": carrito},
+        )
+
+    producto = await catalogos_client.obtener_producto(producto_id)
+    existencias = await inventario_client.listar_existencias_por_almacen(almacen_id)
+    stock = next(
+        (float(e["cantidad_actual"]) for e in existencias if e["producto_id"] == producto_id), 0.0
+    )
+    if stock <= 0:
+        return ResultadoBot(
+            respuesta=f"❌ Lo sentimos, {producto['nombre']} no tiene stock disponible en {agencia_nombre} en este momento.",
+            opciones=["🔎 Ver más productos", "🔙 Menú principal"],
+            nuevo_estado="menu",
+            nuevo_contexto={"carrito": carrito} if carrito else {},
+        )
+
+    precio = producto.get("precio_actual")
+    return ResultadoBot(
+        respuesta=f"🛒 ¿Cuántas unidades de *{producto['nombre']}* deseas agregar? Escribe solo el número.",
+        opciones=None,
+        nuevo_estado="producto_cantidad",
+        nuevo_contexto={
+            "carrito": carrito,
+            "producto_pendiente": {
+                "producto_id": producto_id,
+                "nombre": producto["nombre"],
+                "precio_unitario": float(precio) if precio is not None else 0.0,
+            },
+            "almacen_id": almacen_id,
+            "agencia_nombre": agencia_nombre,
+            "categoria_id": conversacion.contexto.get("categoria_id"),
+        },
+    )
+
+
+_PALABRAS_CANCELAR = ("menu", "cancelar", "salir", "no quiero", "nada", "no gracias")
+
+
+async def handle_producto_cantidad(conversacion: ChatbotConversacion, texto: str) -> ResultadoBot:
+    texto_normalizado = bot_config.normalizar(texto)
+    pendiente = conversacion.contexto.get("producto_pendiente")
+    almacen_id = conversacion.contexto.get("almacen_id")
+    agencia_nombre = conversacion.contexto.get("agencia_nombre", "")
+    carrito = conversacion.contexto.get("carrito")
+
+    if not pendiente or any(p in texto_normalizado for p in _PALABRAS_CANCELAR):
+        resultado = await handle_menu(conversacion, texto)
+        if carrito:
+            resultado.nuevo_contexto["carrito"] = carrito
+        return resultado
+
+    if not texto_normalizado.isdigit() or int(texto_normalizado) <= 0:
+        return ResultadoBot(
+            respuesta="❌ Escribe solo un número entero mayor a 0, ej. 2 (o escribe 'cancelar' para salir)",
+            opciones=None,
+            nuevo_estado="producto_cantidad",
+            nuevo_contexto=conversacion.contexto,
+        )
+
+    cantidad = int(texto_normalizado)
+    existencias = await inventario_client.listar_existencias_por_almacen(almacen_id)
+    stock = next(
+        (float(e["cantidad_actual"]) for e in existencias if e["producto_id"] == pendiente["producto_id"]), 0.0
+    )
+
+    if stock <= 0:
+        resultado = await handle_menu(conversacion, texto)
+        resultado.respuesta = f"❌ Lo sentimos, {pendiente['nombre']} no tiene stock disponible en este momento."
+        if carrito:
+            resultado.nuevo_contexto["carrito"] = carrito
+        return resultado
+
+    if cantidad > stock:
+        return ResultadoBot(
+            respuesta=f"⚠️ Solo hay {int(stock)} unidades disponibles de {pendiente['nombre']}. Escribe otra cantidad (o 'cancelar' para salir).",
+            opciones=None,
+            nuevo_estado="producto_cantidad",
+            nuevo_contexto=conversacion.contexto,
+        )
+
+    carrito = _agregar_item_carrito(carrito, almacen_id, agencia_nombre, pendiente, cantidad)
+    return ResultadoBot(
+        respuesta=f"✅ Agregado: {cantidad} x {pendiente['nombre']}.\n\n{_formatear_resumen_carrito(carrito)}",
+        opciones=["🛍️ Seguir comprando", "✅ Confirmar pedido", "🛒 Ver carrito"],
+        nuevo_estado="menu",
+        nuevo_contexto={"carrito": carrito},
+    )
+
+
+def _agregar_item_carrito(
+    carrito: dict | None, almacen_id: int, agencia_nombre: str, producto: dict, cantidad: int
+) -> dict:
+    if not carrito:
+        carrito = {"almacen_id": almacen_id, "agencia_nombre": agencia_nombre, "items": []}
+    for item in carrito["items"]:
+        if item["producto_id"] == producto["producto_id"]:
+            item["cantidad"] += cantidad
+            return carrito
+    carrito["items"].append({**producto, "cantidad": cantidad})
+    return carrito
+
+
+def _formatear_resumen_carrito(carrito: dict) -> str:
+    lineas = ["🛒 Tu carrito:"]
+    total = 0.0
+    for item in carrito["items"]:
+        subtotal = item["precio_unitario"] * item["cantidad"]
+        total += subtotal
+        lineas.append(f"• {item['nombre']} x{item['cantidad']} — Bs. {subtotal:.2f}")
+    lineas.append(f"\n💰 Total: Bs. {total:.2f}")
+    return "\n".join(lineas)
+
+
+async def handle_carrito(conversacion: ChatbotConversacion, texto: str) -> ResultadoBot:
+    texto_normalizado = bot_config.normalizar(texto)
+    carrito = conversacion.contexto.get("carrito")
+
+    if not carrito or not carrito.get("items"):
+        return ResultadoBot(
+            respuesta="🛒 Tu carrito está vacío. Ve al catálogo para agregar productos.",
+            opciones=bot_config.OPCIONES_MENU,
+            nuevo_estado="menu",
+            nuevo_contexto={},
+        )
+
+    if "confirmar" in texto_normalizado:
+        return await _confirmar_pedido(conversacion, carrito)
+
+    if "vaciar" in texto_normalizado or "cancelar" in texto_normalizado:
+        return ResultadoBot(
+            respuesta="🗑️ Carrito vaciado.",
+            opciones=bot_config.OPCIONES_MENU,
+            nuevo_estado="menu",
+            nuevo_contexto={},
+        )
+
+    if "seguir" in texto_normalizado or "comprando" in texto_normalizado or "catalogo" in texto_normalizado:
+        return await handle_agencias(conversacion, texto)
+
+    return ResultadoBot(
+        respuesta=_formatear_resumen_carrito(carrito),
+        opciones=["✅ Confirmar pedido", "🗑️ Vaciar carrito", "🛍️ Seguir comprando"],
+        nuevo_estado="carrito",
+        nuevo_contexto={"carrito": carrito},
+    )
+
+
+async def _confirmar_pedido(conversacion: ChatbotConversacion, carrito: dict) -> ResultadoBot:
+    detalles = [
+        {"producto_id": i["producto_id"], "cantidad": i["cantidad"], "precio_unitario": i["precio_unitario"]}
+        for i in carrito["items"]
+    ]
+    payload = {
+        "cliente_id": settings.whatsapp_cliente_id,
+        "almacen_id": carrito["almacen_id"],
+        "detalles": detalles,
+        "observaciones": f"Pedido WhatsApp {conversacion.sesion_id}",
+    }
+
+    try:
+        venta = await ventas_client.crear_venta(payload)
+    except HTTPException as exc:
+        detalle = exc.detail if isinstance(exc.detail, str) else "stock insuficiente o error del sistema"
+        return ResultadoBot(
+            respuesta=(
+                f"⚠️ No pudimos confirmar tu pedido: {detalle}.\n"
+                "Tu carrito se mantiene. Ajusta las cantidades escribiendo 'carrito' o intenta de nuevo."
+            ),
+            opciones=["🛒 Ver carrito", "🔙 Menú principal"],
+            nuevo_estado="carrito",
+            nuevo_contexto={"carrito": carrito},
+        )
+
+    pdf_bytes = generar_pdf_pedido(venta, carrito, conversacion.sesion_id)
+    return ResultadoBot(
+        respuesta=(
+            f"✅ ¡Pedido confirmado! Código: {venta['codigo']}\n"
+            f"💰 Total: Bs. {venta['total']}\n📄 Te enviamos el detalle en PDF."
+        ),
+        opciones=bot_config.OPCIONES_MENU,
+        nuevo_estado="menu",
         nuevo_contexto={},
+        pdf_pendiente=pdf_bytes,
+        pdf_nombre=f"Pedido_{venta['codigo']}.pdf",
     )
 
 
@@ -314,11 +540,12 @@ async def handle_catalogo_general(conversacion: ChatbotConversacion, texto: str)
     categorias_contexto = (
         conversacion.contexto.get("categorias") if conversacion.estado == "catalogo_general_categorias" else None
     )
+    carrito = conversacion.contexto.get("carrito")
 
     if categorias_contexto:
         seleccion = resolver_seleccion(texto, categorias_contexto)
         if seleccion:
-            return await _mostrar_productos_general(seleccion["id"], seleccion["nombre"])
+            return await _mostrar_productos_general(seleccion["id"], seleccion["nombre"], carrito)
 
     categorias = await catalogos_client.listar_categorias()
     if not categorias:
@@ -326,7 +553,7 @@ async def handle_catalogo_general(conversacion: ChatbotConversacion, texto: str)
             respuesta="❌ Por el momento no tenemos categorías disponibles.",
             opciones=bot_config.OPCIONES_MENU,
             nuevo_estado="menu",
-            nuevo_contexto={},
+            nuevo_contexto={"carrito": carrito} if carrito else {},
         )
 
     opciones_contexto = [{"id": c["id"], "nombre": c["nombre"]} for c in categorias]
@@ -335,11 +562,11 @@ async def handle_catalogo_general(conversacion: ChatbotConversacion, texto: str)
         respuesta="🌐 Catálogo general.\nSelecciona una categoría escribiendo su número o nombre:",
         opciones=nombres,
         nuevo_estado="catalogo_general_categorias",
-        nuevo_contexto={"categorias": opciones_contexto},
+        nuevo_contexto={"categorias": opciones_contexto, "carrito": carrito},
     )
 
 
-async def _mostrar_productos_general(categoria_id: int, categoria_nombre: str) -> ResultadoBot:
+async def _mostrar_productos_general(categoria_id: int, categoria_nombre: str, carrito: dict | None = None) -> ResultadoBot:
     productos = await catalogos_client.listar_productos()
     productos_categoria = [p for p in productos if p.get("categoria_id") == categoria_id]
 
@@ -348,7 +575,7 @@ async def _mostrar_productos_general(categoria_id: int, categoria_nombre: str) -
             respuesta=f"❌ No hay productos disponibles en la categoría {categoria_nombre}.",
             opciones=bot_config.OPCIONES_MENU,
             nuevo_estado="menu",
-            nuevo_contexto={},
+            nuevo_contexto={"carrito": carrito} if carrito else {},
         )
 
     opciones_contexto = []
@@ -373,12 +600,14 @@ async def _mostrar_productos_general(categoria_id: int, categoria_nombre: str) -
             "productos": opciones_contexto,
             "categoria_id": categoria_id,
             "categoria_nombre": categoria_nombre,
+            "carrito": carrito,
         },
     )
 
 
 async def handle_catalogo_general_productos(conversacion: ChatbotConversacion, texto: str) -> ResultadoBot:
     productos_contexto = conversacion.contexto.get("productos", [])
+    carrito = conversacion.contexto.get("carrito")
 
     seleccion = resolver_seleccion(texto, productos_contexto)
     if not seleccion:
@@ -409,7 +638,7 @@ async def handle_catalogo_general_productos(conversacion: ChatbotConversacion, t
         respuesta="\n".join(lineas),
         opciones=["🔙 Menú principal"],
         nuevo_estado="menu",
-        nuevo_contexto={},
+        nuevo_contexto={"carrito": carrito} if carrito else {},
     )
 
 
@@ -421,6 +650,8 @@ STATE_HANDLERS = {
     "catalogo_general_categorias": handle_catalogo_general,
     "catalogo_general_productos": handle_catalogo_general_productos,
     "producto_detalle": handle_producto_detalle,
+    "producto_cantidad": handle_producto_cantidad,
+    "carrito": handle_carrito,
     "soporte": handle_soporte,
 }
 
@@ -431,6 +662,7 @@ INTENT_HANDLERS = {
     "soporte": handle_soporte,
     "catalogo": handle_agencias,
     "catalogo_general": handle_catalogo_general,
+    "carrito": handle_carrito,
 }
 
 
@@ -448,7 +680,11 @@ ESTADOS_SIN_SELECCION_PENDIENTE = {"menu", "soporte"}
 def _es_opcion_de_estado_actual(conversacion: ChatbotConversacion, texto: str) -> bool:
     texto_normalizado = bot_config.normalizar(texto)
     if conversacion.estado == "producto_detalle":
-        return "ver mas" in texto_normalizado or "mas productos" in texto_normalizado or "menu" in texto_normalizado
+        return any(
+            p in texto_normalizado for p in ("ver mas", "mas productos", "menu", "agregar", "carrito")
+        )
+    if conversacion.estado in ("producto_cantidad", "carrito"):
+        return True
     return False
 
 

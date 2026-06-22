@@ -64,7 +64,7 @@ async def _procesar_mensaje_entrante(db: AsyncSession, message: dict) -> None:
         await whatsapp_client.marcar_como_leido_con_typing(message_id)
 
     conversacion = await conversacion_service.get_or_create_whatsapp(db, from_numero)
-    await mensaje_service.crear(db, conversacion.id, "entrante", texto, wa_message_id=message_id)
+    await mensaje_service.crear(db, conversacion.id, "entrante", texto, wa_message_id=message_id, origen="cliente")
 
     try:
         resultado = await bot.procesar_mensaje(db, from_numero, texto)
@@ -78,6 +78,23 @@ async def _procesar_mensaje_entrante(db: AsyncSession, message: dict) -> None:
         await whatsapp_client.enviar_lista(from_numero, resultado.respuesta, resultado.opciones)
     else:
         await whatsapp_client.enviar_texto(from_numero, resultado.respuesta)
+
+    if resultado.pdf_pendiente:
+        media_id = await whatsapp_client.subir_media(
+            resultado.pdf_pendiente, "application/pdf", resultado.pdf_nombre
+        )
+        if media_id:
+            await whatsapp_client.enviar_documento(from_numero, media_id, resultado.pdf_nombre)
+            await mensaje_service.crear(
+                db,
+                conversacion.id,
+                "saliente",
+                resultado.pdf_nombre,
+                tipo_mensaje="documento",
+                nombre_archivo=resultado.pdf_nombre,
+            )
+        else:
+            logger.warning("Pedido confirmado pero no se pudo enviar el PDF (conversacion_id=%s)", conversacion.id)
 
 
 @router.post("/whatsapp")

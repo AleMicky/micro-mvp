@@ -8,12 +8,13 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-INTENTS_VALIDOS = ["menu", "catalogo", "catalogo_general", "horario", "ubicacion", "soporte"]
+INTENTS_VALIDOS = ["menu", "carrito", "catalogo", "catalogo_general", "horario", "ubicacion", "soporte"]
 
 _SYSTEM_PROMPT = (
     "Eres un clasificador de intenciones para un chatbot de atención al cliente. "
     "Dado un mensaje de un cliente, clasifícalo en una de estas categorías:\n"
     "- menu: quiere volver al menú principal o saludo inicial\n"
+    "- carrito: quiere ver, confirmar o vaciar su carrito de compras/pedido en curso\n"
     "- catalogo: quiere ver el catálogo de una agencia/sucursal específica\n"
     "- catalogo_general: quiere ver todo el catálogo general, sin elegir agencia\n"
     "- horario: pregunta por el horario de atención\n"

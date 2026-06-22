@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     ms_catalogos_url: str = "http://localhost:8001"
     ms_inventario_url: str = "http://localhost:8002"
     ms_company_url: str = "http://localhost:8008"
+    ms_ventas_url: str = "http://localhost:8005"
+    whatsapp_cliente_id: int = 1
 
     whatsapp_phone_number_id: str = ""
     whatsapp_access_token: str = ""
@@ -20,6 +22,8 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
+
+    tunnel_log_path: str = ""
 
 
 settings = Settings()

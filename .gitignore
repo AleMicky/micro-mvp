@@ -32,3 +32,6 @@ Thumbs.db
 
 # Docker (volúmenes locales, no el compose)
 docker-compose.override.yml
+
+# Logs de cloudflared (tunnel-chatbot)
+.tunnel/*.log

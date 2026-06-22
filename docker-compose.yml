@@ -530,6 +530,8 @@ services:
       MS_CATALOGOS_URL: http://ms-catalogos:8001
       MS_INVENTARIO_URL: http://ms-inventario:8002
       MS_COMPANY_URL: http://ms-company:8008
+      MS_VENTAS_URL: http://ms-ventas:8005
+      WHATSAPP_CLIENTE_ID: ${WHATSAPP_CLIENTE_ID}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN}
@@ -537,8 +539,11 @@ services:
       WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL}
+      TUNNEL_LOG_PATH: /tunnel/chatbot.log
     ports:
       - "${MS_CHATBOT_PORT}:8011"
+    volumes:
+      - tunnel_chatbot_data:/tunnel:ro
     depends_on:
       postgres-chatbot:
         condition: service_healthy
@@ -548,12 +553,26 @@ services:
         condition: service_healthy
       ms-company:
         condition: service_healthy
+      ms-ventas:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8011/health"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 20s
+
+  tunnel-chatbot:
+    image: cloudflare/cloudflared:latest
+    container_name: tunnel-chatbot
+    user: root
+    restart: unless-stopped
+    command: tunnel --url http://ms-chatbot:8011 --loglevel info --logfile /tunnel/chatbot.log
+    volumes:
+      - tunnel_chatbot_data:/tunnel
+    depends_on:
+      ms-chatbot:
+        condition: service_healthy
 
   api-gateway:
     build:
@@ -622,6 +641,7 @@ services:
         condition: service_healthy
 
 volumes:
+  tunnel_chatbot_data:
   postgres_catalogos_data:
   postgres_inventario_data:
   postgres_auth_data:

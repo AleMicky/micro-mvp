@@ -14,6 +14,9 @@ class ChatbotMensaje(Base):
         ForeignKey("chatbot_conversaciones.id", ondelete="CASCADE"), nullable=False, index=True
     )
     direccion: Mapped[str] = mapped_column(String(10), nullable=False)
+    origen: Mapped[str] = mapped_column(String(10), nullable=False, default="bot")
     texto: Mapped[str] = mapped_column(Text, nullable=False)
+    tipo_mensaje: Mapped[str] = mapped_column(String(10), nullable=False, default="texto")
+    nombre_archivo: Mapped[str | None] = mapped_column(String(255), nullable=True)
     wa_message_id: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True, index=True)
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.database import Base, engine
-from app.routers import chatbot, health, whatsapp_webhook
+from app.routers import chatbot, etiquetas, health, whatsapp_webhook
 
 
 @asynccontextmanager
@@ -21,4 +21,5 @@ app = FastAPI(
 )
 app.include_router(health.router)
 app.include_router(chatbot.router)
+app.include_router(etiquetas.router)
 app.include_router(whatsapp_webhook.router)

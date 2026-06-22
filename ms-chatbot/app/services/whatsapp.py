@@ -18,8 +18,30 @@ class WhatsAppClient:
             f"/{settings.whatsapp_phone_number_id}/messages"
         )
 
+    def _url_media(self) -> str:
+        return (
+            f"https://graph.facebook.com/{settings.whatsapp_api_version}"
+            f"/{settings.whatsapp_phone_number_id}/media"
+        )
+
     def _headers(self) -> dict:
         return {"Authorization": f"Bearer {settings.whatsapp_access_token}"}
+
+    async def subir_media(self, contenido: bytes, mime_type: str, filename: str) -> str | None:
+        files = {"file": (filename, contenido, mime_type)}
+        data = {"messaging_product": "whatsapp", "type": mime_type}
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    self._url_media(), headers=self._headers(), data=data, files=files
+                )
+            if response.status_code >= 400:
+                logger.warning("Error subiendo media a WhatsApp (%s): %s", response.status_code, response.text)
+                return None
+            return response.json().get("id")
+        except httpx.HTTPError as exc:
+            logger.warning("Error subiendo media a WhatsApp: %s", exc)
+            return None
 
     async def _enviar(self, payload: dict) -> dict:
         try:
@@ -49,6 +71,20 @@ class WhatsAppClient:
             "type": "text",
             "text": {"body": mensaje, "preview_url": False},
         }
+        return await self._enviar(payload)
+
+    async def enviar_imagen(self, to: str, media_id: str, caption: str | None = None) -> dict:
+        image_payload: dict = {"id": media_id}
+        if caption:
+            image_payload["caption"] = caption
+        payload = {"messaging_product": "whatsapp", "to": to, "type": "image", "image": image_payload}
+        return await self._enviar(payload)
+
+    async def enviar_documento(self, to: str, media_id: str, filename: str, caption: str | None = None) -> dict:
+        document_payload: dict = {"id": media_id, "filename": filename}
+        if caption:
+            document_payload["caption"] = caption
+        payload = {"messaging_product": "whatsapp", "to": to, "type": "document", "document": document_payload}
         return await self._enviar(payload)
 
     async def enviar_lista(self, to: str, mensaje: str, opciones: list[str], boton: str = "Ver opciones") -> dict:
