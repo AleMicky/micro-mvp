@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import json
@@ -81,14 +82,19 @@ async def _procesar_mensaje_entrante(db: AsyncSession, message: dict) -> None:
         await whatsapp_client.enviar_texto(from_numero, resultado.respuesta)
 
     if resultado.ubicaciones_pendientes:
-        for ubicacion in resultado.ubicaciones_pendientes:
-            await whatsapp_client.enviar_ubicacion(
-                from_numero,
-                ubicacion["latitud"],
-                ubicacion["longitud"],
-                ubicacion["nombre"],
-                ubicacion["direccion"],
+        await asyncio.gather(
+            *(
+                whatsapp_client.enviar_ubicacion(
+                    from_numero,
+                    ubicacion["latitud"],
+                    ubicacion["longitud"],
+                    ubicacion["nombre"],
+                    ubicacion["direccion"],
+                )
+                for ubicacion in resultado.ubicaciones_pendientes
             )
+        )
+        for ubicacion in resultado.ubicaciones_pendientes:
             await mensaje_service.crear(
                 db, conversacion.id, "saliente", f"📍 {ubicacion['nombre']}", tipo_mensaje="ubicacion"
             )
