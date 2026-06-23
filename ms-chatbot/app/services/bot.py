@@ -23,6 +23,8 @@ class ResultadoBot:
     nuevo_contexto: dict
     pdf_pendiente: bytes | None = None
     pdf_nombre: str | None = None
+    ubicaciones_pendientes: list[dict] | None = None
+    enviar_logo: bool = False
 
 
 def resolver_seleccion(texto: str, opciones: list[dict]) -> dict | None:
@@ -108,16 +110,41 @@ async def handle_horario(conversacion: ChatbotConversacion, texto: str) -> Resul
         opciones=bot_config.OPCIONES_MENU,
         nuevo_estado="menu",
         nuevo_contexto={"carrito": carrito} if carrito else {},
+        enviar_logo=True,
     )
 
 
 async def handle_ubicacion(conversacion: ChatbotConversacion, texto: str) -> ResultadoBot:
     carrito = conversacion.contexto.get("carrito")
+    almacenes = await inventario_client.listar_almacenes()
+
+    ubicaciones = [
+        {
+            "latitud": float(a["latitud"]),
+            "longitud": float(a["longitud"]),
+            "nombre": a.get("nombre", ""),
+            "direccion": a.get("direccion") or "",
+        }
+        for a in almacenes
+        if a.get("latitud") is not None and a.get("longitud") is not None
+    ]
+
+    if not ubicaciones:
+        return ResultadoBot(
+            respuesta=bot_config.MENSAJE_UBICACION,
+            opciones=bot_config.OPCIONES_MENU,
+            nuevo_estado="menu",
+            nuevo_contexto={"carrito": carrito} if carrito else {},
+            enviar_logo=True,
+        )
+
     return ResultadoBot(
-        respuesta=bot_config.MENSAJE_UBICACION,
+        respuesta="📍 Estas son nuestras agencias:",
         opciones=bot_config.OPCIONES_MENU,
         nuevo_estado="menu",
         nuevo_contexto={"carrito": carrito} if carrito else {},
+        ubicaciones_pendientes=ubicaciones,
+        enviar_logo=True,
     )
 
 

@@ -35,13 +35,17 @@ ALMACENES_SEED = [
     {
         "codigo": "ALM-CENTRAL-GEN",
         "nombre": "Almacén General Central",
-        "direccion": "Almacén principal de Sucursal Central",
+        "direccion": "Plaza 14 de Septiembre, Cercado, Cochabamba",
+        "latitud": Decimal("-17.3935"),
+        "longitud": Decimal("-66.1570"),
         "sucursal_codigo": "SUC-CENTRAL",
     },
     {
         "codigo": "ALM-ZN-GEN",
         "nombre": "Almacén General Zona Norte",
-        "direccion": "Almacén principal de Sucursal Zona Norte",
+        "direccion": "Av. Pando, Zona Norte, Cochabamba",
+        "latitud": Decimal("-17.3580"),
+        "longitud": Decimal("-66.1660"),
         "sucursal_codigo": "SUC-NORTE",
     },
 ]
@@ -118,12 +122,16 @@ async def run_seed() -> None:
                     codigo=data["codigo"],
                     nombre=data["nombre"],
                     direccion=data["direccion"],
+                    latitud=data.get("latitud"),
+                    longitud=data.get("longitud"),
                 )
                 _aplicar_snapshot(almacen, snapshot)
                 db.add(almacen)
                 await db.flush()
                 logger.info("Almacén creado: %s", data["codigo"])
             else:
+                almacen.latitud = data.get("latitud")
+                almacen.longitud = data.get("longitud")
                 _aplicar_snapshot(almacen, snapshot)
                 logger.info("Almacén ya existe (snapshot actualizado): %s", data["codigo"])
 

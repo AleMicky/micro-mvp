@@ -33,9 +33,19 @@ const defaultForm = () => ({
   codigo: '',
   nombre: '',
   direccion: '',
+  latitud: null as number | null,
+  longitud: null as number | null,
   sucursal_id: null as number | null,
   activo: true,
 })
+
+const latitudRule = (value: unknown) =>
+  value === null || value === '' || (Number(value) >= -90 && Number(value) <= 90) ||
+  'Debe estar entre -90 y 90'
+
+const longitudRule = (value: unknown) =>
+  value === null || value === '' || (Number(value) >= -180 && Number(value) <= 180) ||
+  'Debe estar entre -180 y 180'
 
 const form = reactive(defaultForm())
 
@@ -152,6 +162,8 @@ function openEdit(item: Almacen) {
     codigo: item.codigo,
     nombre: item.nombre,
     direccion: item.direccion ?? '',
+    latitud: item.latitud ?? null,
+    longitud: item.longitud ?? null,
     sucursal_id: item.sucursal_id ?? null,
     activo: item.activo,
   })
@@ -171,6 +183,8 @@ async function saveItem() {
       codigo: form.codigo.trim(),
       nombre: form.nombre.trim(),
       direccion: form.direccion.trim() || null,
+      latitud: form.latitud,
+      longitud: form.longitud,
       sucursal_id: form.sucursal_id,
       activo: form.activo,
     }
@@ -431,6 +445,30 @@ onMounted(async () => {
                 density="compact"
                 hide-details
                 prepend-inner-icon="mdi-map-marker-outline"
+              />
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model.number="form.latitud"
+                label="Latitud"
+                type="number"
+                step="0.0000001"
+                density="compact"
+                placeholder="Ej. -17.3935"
+                prepend-inner-icon="mdi-crosshairs-gps"
+                :rules="[latitudRule]"
+              />
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model.number="form.longitud"
+                label="Longitud"
+                type="number"
+                step="0.0000001"
+                density="compact"
+                placeholder="Ej. -66.1570"
+                prepend-inner-icon="mdi-crosshairs-gps"
+                :rules="[longitudRule]"
               />
             </v-col>
             <v-col cols="12">

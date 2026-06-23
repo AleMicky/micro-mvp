@@ -1,4 +1,6 @@
-from sqlalchemy import Integer, String, Text
+from decimal import Decimal
+
+from sqlalchemy import Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -17,5 +19,7 @@ class Almacen(Base, AuditoriaMixin):
     codigo: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
     direccion: Mapped[str | None] = mapped_column(Text)
+    latitud: Mapped[Decimal | None] = mapped_column(Numeric(10, 7))
+    longitud: Mapped[Decimal | None] = mapped_column(Numeric(10, 7))
 
     existencias: Mapped[list["Existencia"]] = relationship(back_populates="almacen")

@@ -28,6 +28,8 @@ class AlmacenBase(AuditoriaSchema):
     codigo: str = Field(..., max_length=50)
     nombre: str = Field(..., max_length=150)
     direccion: str | None = None
+    latitud: float | None = Field(None, ge=-90, le=90)
+    longitud: float | None = Field(None, ge=-180, le=180)
 
 
 class AlmacenCreate(AlmacenBase):
@@ -38,6 +40,8 @@ class AlmacenUpdate(BaseModel):
     codigo: str | None = Field(None, max_length=50)
     nombre: str | None = Field(None, max_length=150)
     direccion: str | None = None
+    latitud: float | None = Field(None, ge=-90, le=90)
+    longitud: float | None = Field(None, ge=-180, le=180)
     activo: bool | None = None
     sucursal_id: int | None = None
 

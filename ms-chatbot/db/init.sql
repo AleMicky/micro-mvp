@@ -38,7 +38,7 @@ CREATE TABLE chatbot_mensajes (
     creado_en         TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_chatbot_mensajes_wa_message_id UNIQUE (wa_message_id),
     CONSTRAINT ck_chatbot_mensajes_origen CHECK (origen IN ('cliente', 'bot', 'agente')),
-    CONSTRAINT ck_chatbot_mensajes_tipo_mensaje CHECK (tipo_mensaje IN ('texto', 'imagen', 'documento'))
+    CONSTRAINT ck_chatbot_mensajes_tipo_mensaje CHECK (tipo_mensaje IN ('texto', 'imagen', 'documento', 'ubicacion'))
 );
 
 CREATE INDEX idx_chatbot_mensajes_conversacion ON chatbot_mensajes (conversacion_id);

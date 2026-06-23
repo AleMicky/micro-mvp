@@ -50,7 +50,7 @@ PRODUCTO_ID=$(curl -s "$API/catalogos/productos/codigo/LECHE-PIL-980" -H "$AUTH"
 
 # Crear almacén vinculado a sucursal Prado si no existe
 curl -s -X POST "$API/inventario/almacenes" -H "$AUTH" -H "Content-Type: application/json" \
-  -d '{"codigo":"ALM-PRADO","nombre":"Almacén Sucursal Prado","direccion":"El Prado","activo":true}'
+  -d '{"codigo":"ALM-PRADO","nombre":"Almacén Sucursal Prado","direccion":"El Prado, La Paz","latitud":-16.5031,"longitud":-68.1500,"activo":true}'
 
 ALMACEN_ID=$(curl -s "$API/inventario/almacenes" -H "$AUTH" | python3 -c "import sys,json; d=json.load(sys.stdin); print(next(x['id'] for x in d if 'Prado' in x['nombre']))")
 
@@ -81,7 +81,7 @@ curl -s "$API/notificaciones/cliente/$CLIENTE_ID" -H "$AUTH"
 ## 11. Transferir 50 unidades Prado → El Alto
 ```bash
 ALMACEN_ALTO=$(curl -s -X POST "$API/inventario/almacenes" -H "$AUTH" -H "Content-Type: application/json" \
-  -d '{"codigo":"ALM-ALTO","nombre":"Almacén Sucursal El Alto","activo":true}' 2>/dev/null; \
+  -d '{"codigo":"ALM-ALTO","nombre":"Almacén Sucursal El Alto","direccion":"El Alto, La Paz","latitud":-16.5047,"longitud":-68.1633,"activo":true}' 2>/dev/null; \
   curl -s "$API/inventario/almacenes" -H "$AUTH" | python3 -c "import sys,json; d=json.load(sys.stdin); print(next(x['id'] for x in d if 'Alto' in x['nombre']))")
 
 curl -s -X POST "$API/inventario/stock/transferencia" -H "$AUTH" -H "Content-Type: application/json" \

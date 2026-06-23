@@ -87,6 +87,22 @@ class WhatsAppClient:
         payload = {"messaging_product": "whatsapp", "to": to, "type": "document", "document": document_payload}
         return await self._enviar(payload)
 
+    async def enviar_ubicacion(
+        self, to: str, latitud: float, longitud: float, nombre: str, direccion: str
+    ) -> dict:
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "location",
+            "location": {
+                "latitude": latitud,
+                "longitude": longitud,
+                "name": nombre,
+                "address": direccion,
+            },
+        }
+        return await self._enviar(payload)
+
     async def enviar_lista(self, to: str, mensaje: str, opciones: list[str], boton: str = "Ver opciones") -> dict:
         visibles = opciones[:MAX_FILAS_LISTA]
         restantes = opciones[MAX_FILAS_LISTA:]

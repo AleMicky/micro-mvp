@@ -3,26 +3,33 @@ from app.services.openai_client import openai_client
 KEYWORDS: dict[str, list[str]] = {
     "menu": ["menu", "volver", "inicio", "hola", "buenas", "buenos dias"],
     "carrito": ["carrito", "mi pedido", "mi carrito", "ver carrito", "confirmar pedido", "confirmar"],
-    "catalogo_general": ["catalogo general", "todos los productos", "todo el catalogo"],
-    "catalogo": ["catalogo", "productos", "precio", "precios", "tienes", "venden"],
+    "catalogo_general": ["catalogo general", "todos los productos", "todo el catalogo", "catalogo completo"],
+    "catalogo": ["catalogo", "productos", "precio", "precios", "tienes", "venden", "ofertas", "ofertas por agencia"],
     "horario": ["horario", "horarios", "hora", "abierto", "atienden"],
-    "ubicacion": ["ubicacion", "direccion", "donde", "lugar", "local", "mapa"],
-    "soporte": ["soporte", "ayuda", "asesor", "reclamo"],
+    "ubicacion": ["ubicacion", "direccion", "donde", "lugar", "local", "mapa", "agencias", "nuestras agencias"],
+    "soporte": ["soporte", "ayuda", "asesor", "reclamo", "hablar con un asesor"],
 }
 
-MENSAJE_BIENVENIDA = "👋 Hola, soy el asistente virtual. ¿En qué puedo ayudarte?"
+MENSAJE_BIENVENIDA = (
+    "👋🛍️ ¡Hola! Bienvenido a *Abuelita Serafina SuperMarket*.\n"
+    "Tenemos productos de calidad al mejor precio, listos para ti. "
+    "¿Qué te gustaría ver hoy? 😊"
+)
 
 OPCIONES_MENU = [
-    "📍 Ver catálogo por agencia",
-    "🌐 Ver catálogo general",
-    "⏰ Horario",
-    "📌 Ubicación",
-    "🆘 Soporte",
+    "🛒 Ver ofertas por agencia",
+    "🌐 Ver catálogo completo",
+    "⏰ Horario de atención",
+    "📌 Nuestras agencias",
+    "🆘 Hablar con un asesor",
 ]
 
 OPCION_MENU_PRINCIPAL = "🔙 Menú principal"
 
-MENSAJE_HORARIO = "⏰ Nuestro horario de atención es de Lunes a Sábado de 8:00 a 20:00."
+MENSAJE_HORARIO = (
+    "⏰ ¡Te esperamos! Todas nuestras agencias atienden de Lunes a Sábado de 8:00 a 20:00.\n"
+    "Ven cuando quieras, siempre tenemos algo bueno para ti. 🛍️"
+)
 
 MENSAJE_UBICACION = "📍 Nos encontramos en Av. Principal #123. También puedes ubicarnos en Google Maps buscando nuestro nombre."
 

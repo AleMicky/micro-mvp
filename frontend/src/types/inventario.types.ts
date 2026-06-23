@@ -11,6 +11,8 @@ export interface Almacen {
   codigo: string
   nombre: string
   direccion: string | null
+  latitud?: number | null
+  longitud?: number | null
   sucursal_id?: number | null
   sucursal_codigo?: string | null
   sucursal_nombre?: string | null
@@ -25,6 +27,8 @@ export interface AlmacenCreate {
   codigo: string
   nombre: string
   direccion?: string | null
+  latitud?: number | null
+  longitud?: number | null
   sucursal_id?: number | null
   activo?: boolean
 }
@@ -33,6 +37,8 @@ export interface AlmacenUpdate {
   codigo?: string
   nombre?: string
   direccion?: string | null
+  latitud?: number | null
+  longitud?: number | null
   sucursal_id?: number | null
   activo?: boolean
 }

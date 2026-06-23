@@ -13,6 +13,7 @@ from app.services import bot
 from app.services.bot_config import MENSAJE_ERROR_SERVICIO
 from app.services.conversacion import conversacion_service
 from app.services.mensaje import mensaje_service
+from app.services.static_media import obtener_logo
 from app.services.whatsapp import whatsapp_client
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,49 @@ async def _procesar_mensaje_entrante(db: AsyncSession, message: dict) -> None:
         await whatsapp_client.enviar_lista(from_numero, resultado.respuesta, resultado.opciones)
     else:
         await whatsapp_client.enviar_texto(from_numero, resultado.respuesta)
+
+    if resultado.ubicaciones_pendientes:
+        for ubicacion in resultado.ubicaciones_pendientes:
+            await whatsapp_client.enviar_ubicacion(
+                from_numero,
+                ubicacion["latitud"],
+                ubicacion["longitud"],
+                ubicacion["nombre"],
+                ubicacion["direccion"],
+            )
+            await mensaje_service.crear(
+                db, conversacion.id, "saliente", f"📍 {ubicacion['nombre']}", tipo_mensaje="ubicacion"
+            )
+
+    if resultado.enviar_logo:
+        logo = obtener_logo()
+        if not logo:
+            logger.warning("Logo no encontrado en static/logo.png")
+        else:
+            media_id = await whatsapp_client.subir_media(logo, "image/png", "logo.png")
+            if not media_id:
+                logger.warning("No se pudo subir el logo a WhatsApp (conversacion_id=%s)", conversacion.id)
+            else:
+                envio = await whatsapp_client.enviar_imagen(from_numero, media_id)
+                if not envio.get("error"):
+                    await mensaje_service.crear(db, conversacion.id, "saliente", "🖼️ logo.png", tipo_mensaje="imagen")
+                else:
+                    logger.warning(
+                        "Reintentando envío de logo tras fallo (conversacion_id=%s): %s",
+                        conversacion.id,
+                        envio.get("error"),
+                    )
+                    envio_retry = await whatsapp_client.enviar_imagen(from_numero, media_id)
+                    if not envio_retry.get("error"):
+                        await mensaje_service.crear(
+                            db, conversacion.id, "saliente", "🖼️ logo.png", tipo_mensaje="imagen"
+                        )
+                    else:
+                        logger.warning(
+                            "No se pudo enviar el logo tras reintento (conversacion_id=%s): %s",
+                            conversacion.id,
+                            envio_retry.get("error"),
+                        )
 
     if resultado.pdf_pendiente:
         media_id = await whatsapp_client.subir_media(
