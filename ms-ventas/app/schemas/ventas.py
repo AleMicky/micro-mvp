@@ -56,6 +56,7 @@ class DetalleResponse(DetalleBase):
 
 class CotizacionVentaBase(BaseModel):
     cliente_id: int
+    almacen_id: int = 1
     fecha: str | None = None
     observaciones: str | None = None
     estado: str = "BORRADOR"
@@ -65,6 +66,7 @@ class CotizacionVentaCreate(CotizacionVentaBase):
 
 class CotizacionVentaUpdate(BaseModel):
     cliente_id: int | None = None
+    almacen_id: int | None = None
     fecha: str | None = None
     observaciones: str | None = None
     estado: str | None = None

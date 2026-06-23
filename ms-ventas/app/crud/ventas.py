@@ -50,7 +50,7 @@ class CRUDCotizacionVenta:
     async def create(self, db: AsyncSession, payload: CotizacionVentaCreate) -> CotizacionVenta:
         codigo = await _next_codigo(db, "COT-V", CotizacionVenta)
         total = sum(_calc(d.cantidad, d.precio_unitario) for d in payload.detalles)
-        obj = CotizacionVenta(codigo=codigo, cliente_id=payload.cliente_id, estado=payload.estado, fecha=payload.fecha, observaciones=payload.observaciones, total=total)
+        obj = CotizacionVenta(codigo=codigo, cliente_id=payload.cliente_id, almacen_id=payload.almacen_id, estado=payload.estado, fecha=payload.fecha, observaciones=payload.observaciones, total=total)
         db.add(obj)
         await db.flush()
         for d in payload.detalles:
@@ -59,7 +59,7 @@ class CRUDCotizacionVenta:
         return await self.get(db, obj.id)  # type: ignore
 
     async def update(self, db: AsyncSession, obj: CotizacionVenta, payload: CotizacionVentaUpdate) -> CotizacionVenta:
-        for field in ("cliente_id", "fecha", "observaciones", "estado", "activo"):
+        for field in ("cliente_id", "almacen_id", "fecha", "observaciones", "estado", "activo"):
             val = getattr(payload, field)
             if val is not None:
                 setattr(obj, field, val)

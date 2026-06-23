@@ -2,7 +2,7 @@ from app.services.openai_client import openai_client
 
 KEYWORDS: dict[str, list[str]] = {
     "menu": ["menu", "volver", "inicio", "hola", "buenas", "buenos dias"],
-    "carrito": ["carrito", "mi pedido", "mi carrito", "ver carrito"],
+    "carrito": ["carrito", "mi pedido", "mi carrito", "ver carrito", "confirmar pedido", "confirmar"],
     "catalogo_general": ["catalogo general", "todos los productos", "todo el catalogo"],
     "catalogo": ["catalogo", "productos", "precio", "precios", "tienes", "venden"],
     "horario": ["horario", "horarios", "hora", "abierto", "atienden"],

@@ -25,6 +25,7 @@ class CotizacionVenta(Base, AuditoriaMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     codigo: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     cliente_id: Mapped[int] = mapped_column(ForeignKey("clientes.id"), nullable=False)
+    almacen_id: Mapped[int] = mapped_column(nullable=False, default=1)
     estado: Mapped[str] = mapped_column(String(20), default="BORRADOR", nullable=False)
     fecha: Mapped[str | None] = mapped_column(String(10))
     observaciones: Mapped[str | None] = mapped_column(Text)

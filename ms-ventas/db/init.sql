@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS cotizaciones_venta (
     id SERIAL PRIMARY KEY,
     codigo VARCHAR(50) UNIQUE NOT NULL,
     cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+    almacen_id INTEGER NOT NULL DEFAULT 1,
     estado VARCHAR(20) NOT NULL DEFAULT 'BORRADOR',
     fecha VARCHAR(10),
     observaciones TEXT,

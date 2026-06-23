@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.crud.ventas import crud_cotizacion
-from app.schemas.ventas import CotizacionVentaCreate, CotizacionVentaResponse, CotizacionVentaUpdate
+from app.schemas.ventas import CotizacionVentaCreate, CotizacionVentaResponse, CotizacionVentaUpdate, VentaResponse
+from app.services.venta import venta_service
 
 router = APIRouter(prefix="/cotizaciones", tags=["cotizaciones"])
 
@@ -35,3 +36,7 @@ async def eliminar(id: int, db: AsyncSession = Depends(get_db)):
     if not obj:
         raise HTTPException(status_code=404, detail="Cotización no encontrada")
     await crud_cotizacion.delete(db, obj)
+
+@router.post("/{id}/aprobar", response_model=VentaResponse)
+async def aprobar(id: int, db: AsyncSession = Depends(get_db)):
+    return await venta_service.aprobar_cotizacion(db, id)

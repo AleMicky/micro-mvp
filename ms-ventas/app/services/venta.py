@@ -5,10 +5,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.ventas import _next_codigo, crud_factura, crud_venta
+from app.crud.ventas import _next_codigo, crud_cotizacion, crud_factura, crud_venta
 from app.events.publisher import publish_event
 from app.models import Factura, FacturaDetalle, Venta, VentaDetalle
-from app.schemas.ventas import FacturaCreate, VentaCreate
+from app.schemas.ventas import DetalleCreate, FacturaCreate, VentaCreate
 from app.services.clients import catalogos_client, clientes_client, finanzas_client, inventario_client
 
 
@@ -89,6 +89,32 @@ class VentaService:
         venta_obj.estado = "COMPLETADA"
         await db.commit()
         return await crud_venta.get(db, venta.id)
+
+    async def aprobar_cotizacion(self, db: AsyncSession, cotizacion_id: int) -> Venta:
+        cotizacion = await crud_cotizacion.get(db, cotizacion_id)
+        if not cotizacion:
+            raise HTTPException(status_code=404, detail="Cotización no encontrada")
+        if cotizacion.estado not in ("BORRADOR", "PENDIENTE"):
+            raise HTTPException(
+                status_code=400, detail=f"No se puede aprobar una cotización en estado {cotizacion.estado}"
+            )
+
+        venta_payload = VentaCreate(
+            cliente_id=cotizacion.cliente_id,
+            cotizacion_id=cotizacion.id,
+            almacen_id=cotizacion.almacen_id,
+            observaciones=cotizacion.observaciones,
+            detalles=[
+                DetalleCreate(producto_id=d.producto_id, cantidad=d.cantidad, precio_unitario=d.precio_unitario)
+                for d in cotizacion.detalles
+            ],
+        )
+        venta = await self.procesar_venta_completa(db, venta_payload)
+
+        cotizacion_obj = await crud_cotizacion.get(db, cotizacion_id)
+        cotizacion_obj.estado = "CONFIRMADA"
+        await db.commit()
+        return venta
 
     async def confirmar_venta(self, db: AsyncSession, venta_id: int):
         venta = await crud_venta.get(db, venta_id)

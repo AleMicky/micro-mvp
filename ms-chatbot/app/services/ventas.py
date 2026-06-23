@@ -5,8 +5,8 @@ from app.core.config import settings
 
 
 class VentasClient:
-    async def crear_venta(self, payload: dict) -> dict:
-        url = f"{settings.ms_ventas_url}/ventas"
+    async def _post(self, ruta: str, payload: dict) -> dict:
+        url = f"{settings.ms_ventas_url}{ruta}"
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.post(url, json=payload)
@@ -23,6 +23,12 @@ class VentasClient:
                 pass
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
         return response.json()
+
+    async def crear_venta(self, payload: dict) -> dict:
+        return await self._post("/ventas", payload)
+
+    async def crear_cotizacion(self, payload: dict) -> dict:
+        return await self._post("/cotizaciones", payload)
 
 
 ventas_client = VentasClient()

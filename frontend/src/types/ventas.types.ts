@@ -28,6 +28,7 @@ export interface CotizacionVenta extends Auditoria {
   id: number
   codigo: string
   cliente_id: number
+  almacen_id: number
   estado: string
   fecha?: string | null
   observaciones?: string | null
@@ -37,6 +38,7 @@ export interface CotizacionVenta extends Auditoria {
 
 export interface CotizacionVentaCreate {
   cliente_id: number
+  almacen_id?: number
   estado?: string
   fecha?: string | null
   observaciones?: string | null

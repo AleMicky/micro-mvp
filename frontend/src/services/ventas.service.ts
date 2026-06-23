@@ -35,6 +35,9 @@ export const ventasService = {
   deleteCotizacion(id: number) {
     return api.delete(`/ventas/cotizaciones/${id}`)
   },
+  aprobarCotizacion(id: number) {
+    return api.post<Venta>(`/ventas/cotizaciones/${id}/aprobar`)
+  },
   getVentas() {
     return api.get<Venta[]>('/ventas/ventas')
   },

@@ -21,8 +21,11 @@ const deleting = ref(false)
 const search = ref('')
 const dialog = ref(false)
 const confirmOpen = ref(false)
+const aprobarOpen = ref(false)
+const aprobando = ref(false)
 const editingId = ref<number | null>(null)
 const deleteTarget = ref<CotizacionVenta | null>(null)
+const aprobarTarget = ref<CotizacionVenta | null>(null)
 const formRef = ref<{ validate: () => Promise<{ valid: boolean }> } | null>(null)
 
 const headers = [
@@ -104,6 +107,11 @@ function openEdit(item: CotizacionVenta) {
 function openDelete(item: CotizacionVenta) {
   deleteTarget.value = item
   confirmOpen.value = true
+}
+
+function openAprobar(item: CotizacionVenta) {
+  aprobarTarget.value = item
+  aprobarOpen.value = true
 }
 
 function agregarDetalle() {
@@ -191,6 +199,21 @@ async function confirmDelete() {
   }
 }
 
+async function confirmAprobar() {
+  if (!aprobarTarget.value) return
+  aprobando.value = true
+  try {
+    const { data: venta } = await ventasService.aprobarCotizacion(aprobarTarget.value.id)
+    appStore.showSuccess(`Cotización aprobada. Venta generada: ${venta.codigo}`)
+    aprobarOpen.value = false
+    await loadData()
+  } catch (e) {
+    appStore.showError(getErrorMessage(e))
+  } finally {
+    aprobando.value = false
+  }
+}
+
 onMounted(() => {
   loadData()
   loadCatalogos()
@@ -205,6 +228,14 @@ onMounted(() => {
     <template #item.cliente_id="{ value }">{{ clienteMap[value] ?? value }}</template>
     <template #item.estado="{ value }"><v-chip :color="ESTADO_VENTA_COLORS[value] ?? 'default'" size="small" variant="tonal">{{ value }}</v-chip></template>
     <template #item.actions="{ item }">
+      <v-btn
+        v-if="item.estado === 'PENDIENTE' || item.estado === 'BORRADOR'"
+        icon="mdi-check-circle-outline"
+        size="small"
+        variant="text"
+        color="success"
+        @click="openAprobar(item)"
+      />
       <v-btn icon="mdi-pencil-outline" size="small" variant="text" @click="openEdit(item)" />
       <v-btn icon="mdi-delete-outline" size="small" variant="text" color="error" @click="openDelete(item)" />
     </template>
@@ -327,6 +358,18 @@ onMounted(() => {
     :loading="deleting"
     :message="`¿Eliminar la cotización «${deleteTarget?.codigo}»?`"
     @confirm="confirmDelete"
+  />
+
+  <ConfirmDialog
+    v-model="aprobarOpen"
+    title="Aprobar cotización"
+    :message="`¿Aprobar la cotización «${aprobarTarget?.codigo}» y generar la venta correspondiente? Se descontará el stock y se generará la factura.`"
+    confirm-text="Aprobar"
+    confirm-color="success"
+    icon="mdi-check-circle-outline"
+    icon-color="success"
+    :loading="aprobando"
+    @confirm="confirmAprobar"
   />
 </template>
 

@@ -504,17 +504,18 @@ async def _confirmar_pedido(conversacion: ChatbotConversacion, carrito: dict) ->
     payload = {
         "cliente_id": settings.whatsapp_cliente_id,
         "almacen_id": carrito["almacen_id"],
+        "estado": "PENDIENTE",
         "detalles": detalles,
         "observaciones": f"Pedido WhatsApp {conversacion.sesion_id}",
     }
 
     try:
-        venta = await ventas_client.crear_venta(payload)
+        cotizacion = await ventas_client.crear_cotizacion(payload)
     except HTTPException as exc:
         detalle = exc.detail if isinstance(exc.detail, str) else "stock insuficiente o error del sistema"
         return ResultadoBot(
             respuesta=(
-                f"⚠️ No pudimos confirmar tu pedido: {detalle}.\n"
+                f"⚠️ No pudimos generar tu cotización: {detalle}.\n"
                 "Tu carrito se mantiene. Ajusta las cantidades escribiendo 'carrito' o intenta de nuevo."
             ),
             opciones=["🛒 Ver carrito", "🔙 Menú principal"],
@@ -522,17 +523,19 @@ async def _confirmar_pedido(conversacion: ChatbotConversacion, carrito: dict) ->
             nuevo_contexto={"carrito": carrito},
         )
 
-    pdf_bytes = generar_pdf_pedido(venta, carrito, conversacion.sesion_id)
+    pdf_bytes = generar_pdf_pedido(cotizacion, carrito, conversacion.sesion_id)
     return ResultadoBot(
         respuesta=(
-            f"✅ ¡Pedido confirmado! Código: {venta['codigo']}\n"
-            f"💰 Total: Bs. {venta['total']}\n📄 Te enviamos el detalle en PDF."
+            f"📋 ¡Cotización generada! Código: {cotizacion['codigo']}\n"
+            f"💰 Total: Bs. {cotizacion['total']}\n"
+            "📄 Te enviamos el detalle en PDF.\n"
+            "Nuestro equipo de ventas la revisará y te confirmaremos en breve."
         ),
         opciones=bot_config.OPCIONES_MENU,
         nuevo_estado="menu",
         nuevo_contexto={},
         pdf_pendiente=pdf_bytes,
-        pdf_nombre=f"Pedido_{venta['codigo']}.pdf",
+        pdf_nombre=f"Cotizacion_{cotizacion['codigo']}.pdf",
     )
 
 
