@@ -239,6 +239,7 @@ async def _mostrar_productos(
 ) -> ResultadoBot:
     productos = await catalogos_client.listar_productos()
     productos_categoria = [p for p in productos if p.get("categoria_id") == categoria_id]
+    productos_categoria.sort(key=lambda p: p.get("creado_en") or "", reverse=True)
 
     if not productos_categoria:
         return ResultadoBot(
@@ -599,6 +600,7 @@ async def handle_catalogo_general(conversacion: ChatbotConversacion, texto: str)
 async def _mostrar_productos_general(categoria_id: int, categoria_nombre: str, carrito: dict | None = None) -> ResultadoBot:
     productos = await catalogos_client.listar_productos()
     productos_categoria = [p for p in productos if p.get("categoria_id") == categoria_id]
+    productos_categoria.sort(key=lambda p: p.get("creado_en") or "", reverse=True)
 
     if not productos_categoria:
         return ResultadoBot(
